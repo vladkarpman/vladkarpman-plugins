@@ -1,0 +1,23 @@
+{
+  "name": "vladkarpman-plugins",
+  "owner": {
+    "name": "Vladislav Karpman",
+    "email": "vladislavkarpman@gmail.com"
+  },
+  "metadata": {
+    "description": "Claude Code plugins by Vladislav Karpman",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "mobile-ui-testing",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/vladkarpman/mobile-ui-testing.git"
+      },
+      "description": "YAML-based mobile UI testing framework with mobile-mcp",
+      "version": "2.0.0",
+      "strict": true
+    }
+  ]
+}
