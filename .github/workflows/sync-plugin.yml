@@ -1,5 +1,8 @@
 name: Sync Plugin Version
 
+# Phase 1: Basic webhook receiver with logging
+# Full validation and sync logic added in subsequent tasks
+
 on:
   repository_dispatch:
     types: [plugin_release]
@@ -18,6 +21,8 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read  # Only need to read repo for now
     steps:
       - name: Checkout marketplace
         uses: actions/checkout@v4
