@@ -12,46 +12,58 @@ The marketplace uses automated version syncing and release creation through GitH
 
 ## Releasing a Plugin Update
 
-### 1. Update Plugin Version
+### Quick Release (Recommended)
 
-Edit the plugin's `plugin.json` file:
+Just update the plugin version and push - everything else is automatic:
 
 ```bash
-# Example: Update mobile-ui-testing
+# 1. Update plugin version
 vim plugins/mobile-ui-testing/.claude-plugin/plugin.json
+# Change: "version": "3.3.2" → "3.3.3"
+
+# 2. Commit and push
+git add plugins/mobile-ui-testing/.claude-plugin/plugin.json
+git commit -m "feat(mobile-ui-testing): add new feature"
+git push origin main
+
+# 3. GitHub Actions automatically:
+#    ✅ Syncs marketplace.json
+#    ✅ Creates release tag
+#    ✅ Generates changelog
+#    ✅ Publishes GitHub release
 ```
 
-Change the version field following [semantic versioning](https://semver.org/):
+That's it! The entire release process is automated.
+
+### Manual Sync (Optional)
+
+If you want to preview changes before pushing:
+
+```bash
+# 1. Update plugin version
+vim plugins/mobile-ui-testing/.claude-plugin/plugin.json
+
+# 2. Run sync script locally
+./scripts/sync-versions.sh
+
+# 3. Review changes
+git diff .claude-plugin/marketplace.json
+
+# 4. Commit and push both files
+git add plugins/mobile-ui-testing/.claude-plugin/plugin.json
+git add .claude-plugin/marketplace.json
+git commit -m "feat(mobile-ui-testing): add new feature"
+git push origin main
+```
+
+### Semantic Versioning
+
+Follow [semantic versioning](https://semver.org/) for plugin updates:
 - **Patch** (1.0.0 → 1.0.1): Bug fixes, no breaking changes
 - **Minor** (1.0.0 → 1.1.0): New features, backward compatible
 - **Major** (1.0.0 → 2.0.0): Breaking changes
 
-### 2. Sync Marketplace Version
-
-Run the sync script locally:
-
-```bash
-./scripts/sync-versions.sh
-```
-
-This updates `.claude-plugin/marketplace.json` to match plugin versions.
-
-### 3. Commit Changes
-
-```bash
-git add plugins/*//.claude-plugin/plugin.json
-git add .claude-plugin/marketplace.json
-git commit -m "chore: bump mobile-ui-testing to v3.3.2"
-git push origin main
-```
-
-### 4. Automated Release
-
-The GitHub Action will automatically:
-- ✅ Verify versions are in sync
-- ✅ Create a git tag (e.g., `v1.2.0`)
-- ✅ Generate release notes with changelog
-- ✅ Publish GitHub release
+The marketplace version is automatically managed and will auto-increment if needed.
 
 ## Marketplace Version Updates
 
@@ -64,28 +76,51 @@ Individual plugin version changes don't require marketplace version bumps.
 
 ## Manual Release Creation
 
-To create a release manually:
+To force a release manually:
 
 ```bash
-# Via GitHub UI: Actions → Create Release → Run workflow
+# Via GitHub UI: Actions → Auto Release → Run workflow → Check "Force release"
 
 # Or via gh CLI:
-gh workflow run release.yml -f version=v1.2.0
+gh workflow run auto-release.yml -f force=true
 ```
 
 ## Version Sync Automation
 
-### On Push to Main
-When you push plugin version changes, the `sync-marketplace.yml` workflow:
-1. Detects plugin.json changes
-2. Runs sync script
-3. Auto-commits updated marketplace.json (if needed)
+The `auto-release.yml` workflow runs when:
+- You push changes to `plugins/*/.claude-plugin/plugin.json`
+- You manually trigger it (Actions → Auto Release → Run workflow)
 
-### On Pull Requests
-When a PR includes plugin version changes:
-1. Workflow validates versions are in sync
-2. Fails PR if marketplace.json is out of sync
-3. Comments with instructions to sync locally
+### What It Does Automatically
+
+1. **Syncs Versions**: Reads plugin.json files and updates marketplace.json
+2. **Handles Conflicts**: If release tag exists, auto-bumps marketplace patch version
+3. **Creates Release**: Generates tag, changelog, and GitHub release
+4. **Notifies**: Adds summary to Actions tab showing what was released
+
+### The Complete Flow
+
+```
+Plugin version change → Push to main
+  ↓
+Auto-release workflow triggers
+  ↓
+Sync plugin versions to marketplace.json
+  ↓
+Check if marketplace version tag exists
+  ↓ (if exists)
+Auto-bump marketplace patch version
+  ↓
+Commit marketplace.json
+  ↓
+Create git tag
+  ↓
+Generate changelog from commits
+  ↓
+Create GitHub release
+  ↓
+Done! Users can update their plugins
+```
 
 ## Local Development
 
@@ -155,19 +190,22 @@ git push --force-with-lease
 
 ### Release Tag Already Exists
 
-If you need to recreate a release:
+The workflow automatically handles this by bumping the marketplace patch version. No manual intervention needed.
+
+If you want to force a specific version:
 
 ```bash
 # Delete local and remote tag
 git tag -d v1.2.0
 git push origin :refs/tags/v1.2.0
 
-# Update marketplace version
+# Update marketplace version manually
 vim .claude-plugin/marketplace.json
 git commit -am "chore: bump marketplace version"
 git push
 
-# Workflow will create new release
+# Trigger workflow again
+gh workflow run auto-release.yml
 ```
 
 ## Best Practices
@@ -188,12 +226,17 @@ vim plugins/mobile-ui-testing/commands/run-test.md
 vim plugins/mobile-ui-testing/.claude-plugin/plugin.json
 # Change: "version": "3.3.2" → "3.3.3"
 
-# 3. Sync and commit
-./scripts/sync-versions.sh
-git add -A
+# 3. Commit and push ONLY the plugin.json
+git add plugins/mobile-ui-testing/.claude-plugin/plugin.json
 git commit -m "feat(mobile-ui-testing): add retry logic to run-test"
 git push origin main
 
-# 4. Wait for GitHub Actions to create release
+# 4. Watch the magic happen! 🎉
+# GitHub Actions will:
+#   - Sync marketplace.json
+#   - Create release v1.2.1 (or bump if needed)
+#   - Generate changelog
+#   - Publish release
+
 # Done! Users can now update with: claude plugin update
 ```
