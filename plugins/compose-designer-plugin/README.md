@@ -119,73 +119,47 @@ Copy a design screenshot, then:
 
 ## Configuration Reference
 
-### Full Configuration Schema
+Configuration lives in `.claude/compose-designer.yaml`. For detailed documentation of all options, see **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)**.
+
+### Required Fields
 
 ```yaml
-# Project conventions
-naming:
-  component_suffix: "Component"        # Suffix for components (e.g., ButtonComponent)
-  screen_suffix: "Screen"              # Suffix for screens (e.g., HomeScreen)
-  preview_annotation: "@Preview"       # Preview annotation
-
-# Code generation
-architecture:
-  stateless_components: true           # Generate stateless by default
-  state_hoisting: true                 # Hoist state to parent
-  remember_saveable: false             # Use rememberSaveable instead of remember
-
-# Preview settings
-preview:
-  show_background: true
-  background_color: "#FFFFFF"
-  device_spec: "spec:width=411dp,height=891dp"  # Pixel 4 default
-  font_scale: 1.0
-
-# Validation thresholds
-validation:
-  visual_similarity_threshold: 0.92    # 0.0-1.0, higher = stricter
-  max_ralph_iterations: 8              # Max refinement iterations
-  preview_screenshot_delay: "auto"     # "auto" or milliseconds
-
-# Batch processing
-batch:
-  mode: "sequential"                   # "sequential" or "parallel"
-
-# Device testing
-testing:
-  test_activity_package: "com.example.app.test"  # Required: test package
-  test_activity_name: "ComposeTestActivity"
-  device_id: "auto"                    # "auto" or specific device ID
-  interaction_depth: "comprehensive"   # "basic" or "comprehensive"
-  cleanup_artifacts: "ask"             # "always", "never", or "ask"
-
-# Figma integration
-figma:
-  extract_tokens: true                 # Extract design tokens from Figma
-  api_token_source: "config"           # "config" or "env"
-  api_token: ""                        # Token (if source is "config")
-  fallback_to_image: true              # Fall back to image if token extraction fails
-
-# Output preferences
 output:
-  package_base: "com.example.app"      # Required: base package name
-  default_output_dir: "app/src/main/java"
-  include_comments: false              # Add explanatory comments
-  extract_theme_from_existing: true    # Learn from existing Color.kt, Type.kt
+  package_base: "com.yourapp"              # Your app's base package
+
+testing:
+  test_activity_package: "com.yourapp.test"  # Package for test activity
 ```
 
-### Smart Defaults
+### Quick Reference
 
-The plugin uses intelligent defaults when fields are missing:
+| Section | Key Fields | Options |
+|---------|------------|---------|
+| `model` | `default`, `design_generator`, `visual_validator` | `opus`, `sonnet`, `haiku` |
+| `naming` | `component_suffix`, `screen_suffix` | Any string |
+| `validation` | `visual_similarity_threshold` | `0.0` - `1.0` (default: `0.92`) |
+| `validation` | `max_ralph_iterations` | Integer (default: `10`) |
+| `testing` | `device_id` | `"auto"`, device ID, or name pattern (`"Pixel*"`) |
+| `testing` | `interaction_depth` | `"basic"`, `"comprehensive"` |
+| `testing` | `cleanup_artifacts` | `"always"`, `"never"`, `"ask"` |
+| `batch` | `mode` | `"sequential"`, `"parallel"` |
+| `figma` | `api_token_source` | `"env"`, `"config"` |
 
-- **Naming**: Standard Android conventions (Component, Screen suffixes)
-- **Architecture**: Stateless components with state hoisting
-- **Validation**: 92% similarity threshold, 8 max iterations
-- **Testing**: Comprehensive interaction testing
+### Minimal Config Example
 
-**Required Fields** (plugin will prompt if missing):
-- `output.package_base`
-- `testing.test_activity_package`
+```yaml
+model:
+  default: "opus"
+
+output:
+  package_base: "com.yourapp"
+
+testing:
+  test_activity_package: "com.yourapp.test"
+  device_id: "auto"
+```
+
+See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for complete examples and preset configurations.
 
 ## Usage Examples
 
