@@ -7,7 +7,7 @@ capabilities:
   - Analyze visual differences using LLM vision
   - Apply targeted fixes based on feedback
   - Iterate until threshold reached or max iterations
-model: sonnet
+model: opus
 color: blue
 tools:
   - Read

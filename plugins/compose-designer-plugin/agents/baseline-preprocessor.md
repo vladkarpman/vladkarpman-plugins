@@ -1,7 +1,7 @@
 ---
 name: baseline-preprocessor
 description: Preprocesses design baselines by detecting device frames, cropping to content area, handling composite layouts, and calculating realistic similarity targets based on baseline complexity
-model: sonnet
+model: opus
 color: orange
 tools:
   - Read

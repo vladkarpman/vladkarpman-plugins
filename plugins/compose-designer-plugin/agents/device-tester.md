@@ -7,7 +7,7 @@ capabilities:
   - Test interactive elements (buttons, text fields, scrolling)
   - Compare device rendering with baseline design
   - Clean up test artifacts after validation
-model: sonnet
+model: opus
 color: purple
 tools:
   - Read

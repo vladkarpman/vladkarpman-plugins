@@ -7,7 +7,7 @@ capabilities:
   - Integrate with existing theme when available
   - Create realistic mock data for previews
   - Handle Figma API integration for design token extraction
-model: sonnet
+model: opus
 color: blue
 tools:
   - Read
