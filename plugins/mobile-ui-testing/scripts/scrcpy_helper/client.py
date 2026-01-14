@@ -9,6 +9,8 @@ from typing import Callable, Optional
 
 import numpy as np
 
+from .frame_buffer import FrameBuffer
+
 try:
     import scrcpy
     SCRCPY_AVAILABLE = True
@@ -19,7 +21,7 @@ except ImportError:
 class ScrcpyClient:
     """Manages scrcpy connection to an Android device."""
 
-    def __init__(self):
+    def __init__(self, max_buffer_frames: int = 120, max_buffer_seconds: float = 2.0):
         self.client: "scrcpy.Client | None" = None
         self.device_id: str | None = None
         self.connected = False
@@ -28,6 +30,12 @@ class ScrcpyClient:
         self.frame_count = 0
         self.lock = threading.Lock()
         self._on_frame_callbacks: list[Callable[[np.ndarray, float], None]] = []
+
+        # Frame buffer for analysis
+        self.frame_buffer = FrameBuffer(
+            max_frames=max_buffer_frames,
+            max_seconds=max_buffer_seconds
+        )
 
     def _log(self, message: str) -> None:
         """Log to stderr."""
@@ -43,6 +51,9 @@ class ScrcpyClient:
             self.last_frame = frame
             self.last_frame_time = timestamp
             self.frame_count += 1
+
+        # Add to frame buffer
+        self.frame_buffer.add_frame(frame, timestamp)
 
         # Notify callbacks
         for callback in self._on_frame_callbacks:
