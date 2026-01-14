@@ -15,6 +15,9 @@ tools:
   - Bash
   - WebFetch
   - Glob
+  - mcp__figma-desktop__get_design_context
+  - mcp__figma-desktop__get_variable_defs
+  - mcp__figma-desktop__get_screenshot
 ---
 
 # Design Generator Agent
@@ -34,6 +37,74 @@ The parent command will provide:
 - **type**: "component" or "screen"
 - **output_file_path**: Where to write the generated Kotlin file
 - **figma_tokens** (optional): Extracted colors, typography, spacing from Figma API
+- **figma_url** (optional): Original Figma URL if input was a Figma design
+
+## Figma Token Extraction (when Figma URL provided)
+
+If input is a Figma URL, extract precise design tokens BEFORE generating code:
+
+### Step 1: Get Design Context
+
+Use Figma MCP tool:
+```
+mcp__figma-desktop__get_design_context(
+  nodeId: "<extracted_node_id>",
+  clientLanguages: "kotlin",
+  clientFrameworks: "jetpack-compose"
+)
+```
+
+Parse response for:
+- Component hierarchy
+- Layout structure (row, column, stack)
+- Component types (text, button, image, etc.)
+
+### Step 2: Get Variable Definitions
+
+Use Figma MCP tool:
+```
+mcp__figma-desktop__get_variable_defs(
+  nodeId: "<extracted_node_id>"
+)
+```
+
+Parse response for:
+- Colors: Map Figma color names to hex values
+- Spacing: Extract padding, margin, gap values
+- Typography: Font family, size, weight, line height
+- Corner radius values
+- Shadow/elevation values
+
+### Step 3: Get Screenshot as Baseline
+
+Use Figma MCP tool:
+```
+mcp__figma-desktop__get_screenshot(
+  nodeId: "<extracted_node_id>"
+)
+```
+
+Save screenshot as baseline for validation phase.
+
+### Step 4: Generate Code with Precise Values
+
+When generating Compose code, use EXACT values from Figma:
+
+Instead of:
+```kotlin
+// LLM guessing
+color = Color.White
+padding = 16.dp
+```
+
+Use:
+```kotlin
+// Precise from Figma
+color = Color(0xFFFFFFFF)  // From variable_defs
+padding = 16.dp             // From variable_defs spacing token
+```
+
+This results in ~80-85% accuracy on first generation vs ~60-70% with screenshots.
 
 ## Your Workflow
 
