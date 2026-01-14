@@ -20,9 +20,9 @@ No build/compile step - pure markdown commands.
 
 ## Dependencies
 
-### device-manager-mcp (Recommended)
+### screen-buffer-mcp (Fast Screenshots)
 
-For high-performance screenshot and touch injection (~50ms vs ~500ms):
+For high-performance screenshots (~50ms vs ~500ms with mobile-mcp):
 
 ```bash
 # Install uv (Python package runner, like npx for Python)
@@ -31,11 +31,11 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Restart Claude Code after installation
 ```
 
-The plugin automatically uses device-manager-mcp via `uvx` when available. If uv is not installed, it falls back to mobile-mcp (slower but functional).
+The plugin uses screen-buffer-mcp via `uvx` for fast screenshots. Falls back to mobile-mcp if unavailable.
 
-**Benefits of device-manager-mcp:**
+**Benefits of screen-buffer-mcp:**
 - **~50ms** screenshot latency (vs 500-2000ms with mobile-mcp)
-- **~50ms** tap/swipe latency (vs 200-300ms with mobile-mcp)
+- **Frame buffer** - access previous frames for analysis
 - **No bundled dependencies** - runs via uvx on demand
 
 ### Python Dependencies (Optional)
@@ -109,8 +109,8 @@ agents/               # Specialized subagents for advanced workflows
 
 **Key processing flow:**
 ```
-User Action → Command (markdown) → device-manager-mcp tool (fast) → Device
-                                 → mobile-mcp tool (fallback)      → Device
+User Action → Command (markdown) → screen-buffer tool (screenshots) → Device
+                                 → mobile-mcp tool (all other ops)  → Device
            ↓
     AskUserQuestion (for interviews)
            ↓
@@ -121,40 +121,43 @@ User Action → Command (markdown) → device-manager-mcp tool (fast) → Device
 
 The plugin uses two MCP servers for device interaction:
 
-### device-manager-mcp (Preferred - Fast)
+### screen-buffer-mcp (Fast Screenshots)
 
-High-performance device interaction via scrcpy. Runs via `uvx` (requires `uv` installed).
+High-performance screenshots via scrcpy buffer. Runs via `uvx` (requires `uv` installed).
 
 **Tools provided:**
 | Tool | Description |
 |------|-------------|
+| `device_screenshot` | Take screenshot (~50ms) |
+| `device_get_frame` | Get frame from buffer at offset |
 | `device_list` | List connected devices |
 | `device_screen_size` | Get screen dimensions |
-| `device_screenshot` | Take screenshot (~50ms) |
-| `device_tap` | Tap at coordinates (~50ms) |
-| `device_swipe` | Swipe gesture |
-| `device_type` | Type text |
-| `device_press_key` | Press key (BACK, HOME, ENTER) |
+| `device_backend_status` | Check scrcpy connection status |
 
 **Configuration** (`.mcp.json`):
 ```json
 {
-  "device-manager": {
+  "screen-buffer": {
     "command": "uvx",
-    "args": ["device-manager-mcp"]
+    "args": ["screen-buffer-mcp"]
   }
 }
 ```
 
-### mobile-mcp (Fallback + Additional Features)
+### mobile-mcp (Device Operations)
 
 Standard device interaction via adb. Runs via `npx`.
 
 **Used for:**
-- `mobile_list_elements_on_screen` - UI element discovery (device-manager doesn't have this)
+- `mobile_list_available_devices` - Device discovery
+- `mobile_get_screen_size` - Screen dimensions
+- `mobile_click_on_screen_at_coordinates` - Tap
+- `mobile_swipe_on_screen` - Swipe
+- `mobile_type_keys` - Text input
+- `mobile_press_button` - Key events (BACK, HOME, ENTER)
+- `mobile_list_elements_on_screen` - UI element discovery
 - `mobile_launch_app` / `mobile_terminate_app` - App lifecycle
 - `mobile_set_orientation` - Screen orientation
-- Fallback when device-manager is unavailable
 
 **Configuration** (`.mcp.json`):
 ```json
@@ -169,7 +172,7 @@ Standard device interaction via adb. Runs via `npx`.
 ### Troubleshooting MCP Servers
 
 ```bash
-# Check if uv is installed (required for device-manager)
+# Check if uv is installed (required for screen-buffer)
 uvx --version
 
 # Install uv if missing
@@ -635,7 +638,7 @@ allowed-tools:
 
 Implementation details and architectural decisions documented in `docs/plans/`:
 
-- **remove-scrcpy-helper-design.md** - Migration from scrcpy-helper to device-manager-mcp
+- **screen-buffer-integration.md** - Migration to screen-buffer-mcp for fast screenshots
 - **conditional-logic-implementation.md** - Conditional operators design (if_exists, if_screen, etc.)
 - **verification-interview-design.md** - AI-guided verification workflow and checkpoint detection
 - **keyboard-typing-detection.md** - Typing detection heuristics and interview flow
