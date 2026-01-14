@@ -8,3 +8,11 @@ tests/*
 
 # Git worktrees (isolated development branches)
 .worktrees/
+
+# Python virtual environments
+.venv/
+scripts/scrcpy_helper/.venv/
+
+# Python cache
+__pycache__/
+*.pyc

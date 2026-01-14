@@ -6,6 +6,7 @@
 
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$(realpath "$0")")")}"
 SCRCPY_HELPER="${PLUGIN_ROOT}/scripts/scrcpy-helper.py"
+SCRCPY_VENV="${PLUGIN_ROOT}/scripts/scrcpy_helper/.venv"
 PID_FILE="/tmp/scrcpy-helper.pid"
 SOCKET_PATH="/tmp/scrcpy-helper.sock"
 
@@ -29,8 +30,16 @@ start_scrcpy_helper() {
         return 1
     fi
 
+    # Check if venv exists, use it if available
+    if [[ -f "${SCRCPY_VENV}/bin/python3" ]]; then
+        PYTHON="${SCRCPY_VENV}/bin/python3"
+    else
+        # Fallback to system Python (may not have MYScrcpy)
+        PYTHON="python3"
+    fi
+
     # Start in background
-    python3 "$SCRCPY_HELPER" > /dev/null 2>&1 &
+    "$PYTHON" "$SCRCPY_HELPER" > /dev/null 2>&1 &
     echo $! > "$PID_FILE"
 
     # Wait briefly for startup

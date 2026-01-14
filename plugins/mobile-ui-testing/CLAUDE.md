@@ -18,9 +18,11 @@ claude --plugin-dir /path/to/mobile-ui-testing
 
 No build/compile step - pure markdown commands.
 
-## Python Dependencies (Optional)
+## Python Dependencies
 
-The verification interview feature requires Python dependencies for checkpoint detection:
+### Core Dependencies (Python 3.9+)
+
+For verification interview and checkpoint detection:
 
 ```bash
 pip3 install -r scripts/requirements.txt
@@ -29,8 +31,32 @@ pip3 install -r scripts/requirements.txt
 Required packages:
 - `Pillow` - Image processing for checkpoint detection
 - `imagehash` - Perceptual hashing for screen change detection
+- `numpy` - Array processing
 
 **Note:** These are only needed for the verification interview feature during `/stop-recording`. Basic test creation and execution work without these dependencies.
+
+### scrcpy-helper Dependencies (Python 3.12+ required)
+
+For high-performance screenshot and touch injection via scrcpy 3.x:
+
+```bash
+# Install scrcpy CLI (macOS)
+brew install scrcpy
+
+# Create Python 3.12+ virtual environment for scrcpy-helper
+cd scripts/scrcpy_helper
+python3.12 -m venv .venv
+.venv/bin/pip install mysc Pillow imagehash numpy adbutils
+```
+
+**Benefits of scrcpy-helper:**
+- **~45 FPS** continuous frame buffer (vs one-shot screenshots)
+- **~10ms** screenshot latency (vs 500-2000ms with adb)
+- **~10ms** touch injection (vs 200-300ms with adb)
+- **2 second frame history** for analyzing before/after touch
+- **Screen stability detection** using perceptual hashing
+
+**Note:** If scrcpy-helper is not available, the plugin gracefully falls back to mobile-mcp (adb-based). The venv is auto-detected by session hooks.
 
 ## Architecture
 
@@ -63,7 +89,18 @@ scripts/
 ├── monitor-touches.py       # Captures touch events via adb getevent
 ├── extract-frames.py        # Extracts frames from video at touch timestamps
 ├── parse-touches.py         # Parses raw touch events into gestures (legacy)
-└── record-touches.sh        # Touch capture script (legacy)
+├── record-touches.sh        # Touch capture script (legacy)
+├── scrcpy-helper.py         # Entry point for scrcpy-helper server
+├── scrcpy-client.sh         # Bash client for scrcpy-helper commands
+├── scrcpy-or-mcp.sh         # Fallback wrapper (scrcpy → mobile-mcp)
+└── scrcpy_helper/           # scrcpy-helper package (Python 3.12+)
+    ├── .venv/               # Virtual environment with MYScrcpy
+    ├── __init__.py
+    ├── server.py            # Unix socket server
+    ├── client.py            # MYScrcpy connection management
+    ├── frame_buffer.py      # Circular frame buffer with stability detection
+    ├── commands.py          # Command handlers (screenshot, tap, etc.)
+    └── video.py             # Video recording to MP4
 
 templates/            # Example YAML templates (reference only, not used by commands)
 tests/                # Generated test files (gitignored)
@@ -93,6 +130,75 @@ User Action → Command (markdown) → Python/Bash Script → mobile-mcp tool �
     AskUserQuestion (for interviews)
            ↓
     Write YAML test file
+```
+
+## scrcpy-helper Architecture
+
+High-performance screenshot and input injection server using [scrcpy](https://github.com/Genymobile/scrcpy) 3.x via [MYScrcpy](https://github.com/me2sy/MYScrcpy).
+
+### Lifecycle
+
+1. **Session Start**: `hooks/session-start.sh` auto-starts scrcpy-helper server
+2. **Runtime**: Server listens on `/tmp/scrcpy-helper.sock`
+3. **Session End**: `hooks/session-end.sh` gracefully stops the server
+
+### Commands
+
+```bash
+# Via socket (from shell)
+echo "connect DEVICE_ID" | nc -U /tmp/scrcpy-helper.sock
+echo "screenshot base64" | nc -U /tmp/scrcpy-helper.sock
+echo "tap 540 1200" | nc -U /tmp/scrcpy-helper.sock
+echo "status" | nc -U /tmp/scrcpy-helper.sock
+
+# Via wrapper script
+./scripts/scrcpy-or-mcp.sh screenshot /tmp/screen.png
+./scripts/scrcpy-or-mcp.sh tap 540 1200
+./scripts/scrcpy-or-mcp.sh status
+```
+
+### Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `connect [device_id]` | Connect to device via scrcpy |
+| `disconnect` | Disconnect from device |
+| `status` | Get server and connection status (JSON) |
+| `screenshot [base64]` | Take screenshot (PNG or base64) |
+| `tap <x> <y>` | Tap at coordinates |
+| `longpress <x> <y> [ms]` | Long press at coordinates |
+| `swipe <x1> <y1> <x2> <y2>` | Swipe between points |
+| `type <text>` | Type text (via clipboard paste) |
+| `key <keycode>` | Send keycode (back, home, enter) |
+| `frames stable [ms]` | Wait for screen to stabilize |
+| `frames recent <n>` | Get last N frames as ZIP |
+| `record start\|stop` | Video recording control |
+| `quit` | Shutdown server |
+
+### Fallback Mechanism
+
+`scrcpy-or-mcp.sh` automatically falls back to mobile-mcp when:
+- scrcpy-helper socket doesn't exist
+- `PREFER_MCP=1` environment variable set
+- scrcpy-helper returns error
+
+### Troubleshooting scrcpy-helper
+
+```bash
+# Check if server is running
+ls -la /tmp/scrcpy-helper.sock
+
+# Check server status
+echo "status" | nc -U /tmp/scrcpy-helper.sock
+
+# Manually start server
+scripts/scrcpy_helper/.venv/bin/python3 scripts/scrcpy-helper.py
+
+# Check MYScrcpy installation
+scripts/scrcpy_helper/.venv/bin/python3 -c "from myscrcpy.core import Session; print('OK')"
+
+# Check scrcpy version (requires 3.x)
+scrcpy --version
 ```
 
 ## Command Frontmatter Pattern
@@ -549,6 +655,7 @@ allowed-tools:
 
 Implementation details and architectural decisions documented in `docs/plans/`:
 
+- **scrcpy-helper-design.md** - High-performance screenshot/input server using scrcpy 3.x
 - **conditional-logic-implementation.md** - Conditional operators design (if_exists, if_screen, etc.)
 - **verification-interview-design.md** - AI-guided verification workflow and checkpoint detection
 - **keyboard-typing-detection.md** - Typing detection heuristics and interview flow
