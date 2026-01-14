@@ -215,6 +215,20 @@ def get_status_icon(status: str) -> str:
     return icon_map.get(status, "?")
 
 
+def parse_tap_coordinates(result: str) -> tuple:
+    """Extract tap coordinates from result string like 'Tapped at (406, 1645)'."""
+    match = re.search(r"Tapped at \((\d+),\s*(\d+)\)", result)
+    if match:
+        return int(match.group(1)), int(match.group(2))
+    return None, None
+
+
+def extract_yaml_command(action: str) -> str:
+    """Convert action string to YAML command format."""
+    # Action is already in format like "tap: 5" or "verify_screen: description"
+    return action
+
+
 def enrich_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """Add computed fields to data."""
     # Add formatted timestamp
@@ -234,6 +248,13 @@ def enrich_data(data: Dict[str, Any]) -> Dict[str, Any]:
     if "summary" in data and "duration_seconds" in data["summary"]:
         data["duration"] = f"{data['summary']['duration_seconds']:.1f}"
 
+    # Add screen size from device info
+    device = data.get("device", {})
+    screen_width = device.get("screen_width") or data.get("screen_width")
+    screen_height = device.get("screen_height") or data.get("screen_height")
+    if screen_width and screen_height:
+        data["screenSize"] = f"{screen_width}x{screen_height}"
+
     # Enrich each test
     for test in data.get("tests", []):
         test["statusClass"] = get_status_class(test.get("status", ""))
@@ -243,9 +264,25 @@ def enrich_data(data: Dict[str, Any]) -> Dict[str, Any]:
         for step in test.get("steps", []):
             step["statusClass"] = get_status_class(step.get("status", ""))
             step["statusIcon"] = get_status_icon(step.get("status", ""))
+
             # Format step number with zero padding
             if "number" in step:
                 step["numberPadded"] = f"{step['number']:03d}"
+
+            # Extract YAML command for copy button
+            action = step.get("action", "")
+            step["yamlCommand"] = extract_yaml_command(action)
+
+            # Parse tap coordinates for overlay indicator
+            result = step.get("result", "")
+            tap_x, tap_y = parse_tap_coordinates(result)
+            if tap_x is not None and screen_width and screen_height:
+                step["tapX"] = tap_x
+                step["tapY"] = tap_y
+                # Calculate percentage for CSS positioning
+                # Note: screenshot might be cropped, so use approximate positioning
+                step["tapXPercent"] = round((tap_x / screen_width) * 100, 1)
+                step["tapYPercent"] = round((tap_y / screen_height) * 100, 1)
 
     return data
 

@@ -15,6 +15,12 @@
             --text-primary: #f9fafb;
             --text-secondary: #9ca3af;
             --border-color: #4b5563;
+            --accent-color: #3b82f6;
+            --action-tap: #f59e0b;
+            --action-verify: #8b5cf6;
+            --action-type: #06b6d4;
+            --action-wait: #6b7280;
+            --action-swipe: #ec4899;
         }
 
         * {
@@ -31,7 +37,7 @@
         }
 
         .container {
-            max-width: 1000px;
+            max-width: 1200px;
             margin: 0 auto;
             padding: 24px;
         }
@@ -60,6 +66,14 @@
             display: flex;
             align-items: center;
             gap: 6px;
+        }
+
+        .meta-item.resolution {
+            font-family: 'SF Mono', Monaco, 'Inconsolata', monospace;
+            font-size: 0.8rem;
+            background: var(--bg-secondary);
+            padding: 2px 8px;
+            border-radius: 4px;
         }
 
         /* Summary Cards */
@@ -118,15 +132,49 @@
         .progress-segment.failed { background: var(--fail-color); }
         .progress-segment.skipped { background: var(--skip-color); }
 
-        /* Test List */
+        /* Filter Controls */
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
         .section-title {
             font-size: 1.125rem;
-            margin-bottom: 16px;
             display: flex;
             align-items: center;
             gap: 8px;
         }
 
+        .filter-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .filter-btn {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .filter-btn.active {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+            color: white;
+        }
+
+        /* Test List */
         .test-list {
             display: flex;
             flex-direction: column;
@@ -138,6 +186,11 @@
             border-radius: 12px;
             overflow: hidden;
             border-left: 4px solid transparent;
+            transition: opacity 0.2s;
+        }
+
+        .test-item.hidden {
+            display: none;
         }
 
         .test-item.passed { border-left-color: var(--pass-color); }
@@ -223,23 +276,41 @@
 
         /* Expandable Details */
         .test-details {
-            display: none;
-            border-top: 1px solid var(--border-color);
+            max-height: 0;
+            overflow: hidden;
+            border-top: 1px solid transparent;
             background: var(--bg-tertiary);
+            transition: max-height 0.3s ease-out, border-color 0.2s;
         }
 
         .test-item.expanded .test-details {
-            display: block;
+            max-height: 5000px;
+            border-top-color: var(--border-color);
         }
 
         .test-header .expand-icon {
             color: var(--text-secondary);
-            transition: transform 0.2s;
+            transition: transform 0.3s ease;
         }
 
         .test-item.expanded .expand-icon {
             transform: rotate(180deg);
         }
+
+        /* Step Categories */
+        .step-category {
+            padding: 8px 20px;
+            background: var(--bg-secondary);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .step-category.setup { border-left: 3px solid var(--accent-color); }
+        .step-category.test { border-left: 3px solid var(--pass-color); }
+        .step-category.teardown { border-left: 3px solid var(--skip-color); }
 
         /* Steps */
         .steps-list {
@@ -249,17 +320,22 @@
         .step {
             display: flex;
             gap: 12px;
-            padding: 12px 0;
+            padding: 16px 0;
             border-bottom: 1px solid var(--border-color);
+            transition: opacity 0.2s;
         }
 
         .step:last-child {
             border-bottom: none;
         }
 
+        .step.hidden {
+            display: none;
+        }
+
         .step-number {
-            width: 28px;
-            height: 28px;
+            width: 32px;
+            height: 32px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -285,37 +361,158 @@
             min-width: 0;
         }
 
+        .step-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        /* Syntax Highlighting */
         .step-action {
             font-family: 'SF Mono', Monaco, 'Inconsolata', monospace;
             font-size: 0.875rem;
-            margin-bottom: 4px;
             word-break: break-word;
+        }
+
+        .action-keyword {
+            font-weight: 600;
+        }
+
+        .action-keyword.tap { color: var(--action-tap); }
+        .action-keyword.verify { color: var(--action-verify); }
+        .action-keyword.type { color: var(--action-type); }
+        .action-keyword.wait { color: var(--action-wait); }
+        .action-keyword.swipe { color: var(--action-swipe); }
+        .action-keyword.press { color: var(--action-tap); }
+        .action-keyword.launch { color: var(--pass-color); }
+        .action-keyword.terminate { color: var(--fail-color); }
+
+        .step-timing {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            background: var(--bg-secondary);
+            padding: 2px 6px;
+            border-radius: 4px;
         }
 
         .step-result {
             font-size: 0.8rem;
             color: var(--text-secondary);
+            margin-top: 4px;
         }
 
         .step.failed .step-result {
             color: var(--fail-color);
         }
 
-        .step-screenshot {
-            margin-top: 8px;
+        /* Copy Button */
+        .copy-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            opacity: 0;
+            transition: all 0.2s;
         }
 
-        .step-screenshot img {
-            max-width: 200px;
-            max-height: 150px;
+        .step:hover .copy-btn {
+            opacity: 1;
+        }
+
+        .copy-btn:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .copy-btn.copied {
+            color: var(--pass-color);
+        }
+
+        /* Screenshot Gallery */
+        .step-screenshots {
+            margin-top: 12px;
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+            scroll-behavior: smooth;
+        }
+
+        .step-screenshots::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .step-screenshots::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 3px;
+        }
+
+        .step-screenshots::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+
+        .screenshot-container {
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .screenshot-container img {
+            width: 180px;
+            height: auto;
             border-radius: 8px;
             border: 1px solid var(--border-color);
             cursor: pointer;
-            transition: opacity 0.2s;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
 
-        .step-screenshot img:hover {
-            opacity: 0.8;
+        .screenshot-container img:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .screenshot-label {
+            position: absolute;
+            bottom: 8px;
+            left: 8px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        /* Tap Indicator Overlay */
+        .tap-indicator {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border: 3px solid var(--action-tap);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            animation: tap-pulse 1.5s ease-out infinite;
+        }
+
+        .tap-indicator::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 8px;
+            height: 8px;
+            background: var(--action-tap);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        @keyframes tap-pulse {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
         }
 
         /* Failure Details Box */
@@ -384,6 +581,7 @@
             z-index: 1000;
             justify-content: center;
             align-items: center;
+            flex-direction: column;
         }
 
         .modal.active {
@@ -392,7 +590,7 @@
 
         .modal img {
             max-width: 90%;
-            max-height: 90%;
+            max-height: 85%;
             border-radius: 8px;
         }
 
@@ -411,6 +609,36 @@
             opacity: 1;
         }
 
+        .modal-nav {
+            display: flex;
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .modal-nav button {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .modal-nav button:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .modal-nav button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .modal-counter {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .summary {
@@ -426,6 +654,16 @@
                 text-align: left;
                 margin-top: 8px;
             }
+
+            .controls {
+                flex-direction: column;
+                gap: 12px;
+                align-items: flex-start;
+            }
+
+            .screenshot-container img {
+                width: 140px;
+            }
         }
     </style>
 </head>
@@ -434,9 +672,12 @@
         <header>
             <h1>{{testFile}}</h1>
             <div class="meta">
-                <span class="meta-item">📱 {{device.name}}</span>
+                <span class="meta-item">{{device.name}}</span>
                 <span class="meta-item">{{device.platform}} {{device.version}}</span>
-                <span class="meta-item">🕐 {{timestamp}}</span>
+                {{#if screenSize}}
+                <span class="meta-item resolution">{{screenSize}}</span>
+                {{/if}}
+                <span class="meta-item">{{timestamp}}</span>
             </div>
         </header>
 
@@ -467,11 +708,18 @@
             </div>
         </div>
 
-        <h2 class="section-title">📋 Test Results</h2>
+        <div class="controls">
+            <h2 class="section-title">Test Results</h2>
+            <div class="filter-buttons">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="passed">Passed</button>
+                <button class="filter-btn" data-filter="failed">Failed</button>
+            </div>
+        </div>
 
         <div class="test-list">
             {{#each tests}}
-            <div class="test-item {{statusClass}}">
+            <div class="test-item {{statusClass}}" data-status="{{status}}">
                 <div class="test-header" onclick="toggleTest(this)">
                     <div class="test-status {{statusClass}}">{{statusIcon}}</div>
                     <div class="test-info">
@@ -480,7 +728,7 @@
                         <div class="test-description">{{description}}</div>
                         {{/if}}
                         {{#if failure}}
-                        <div class="test-error">✗ {{failure.message}}</div>
+                        <div class="test-error">{{failure.message}}</div>
                         {{/if}}
                     </div>
                     <div class="test-meta">
@@ -508,14 +756,25 @@
                     {{/if}}
                     <div class="steps-list">
                         {{#each steps}}
-                        <div class="step {{statusClass}}">
+                        <div class="step {{statusClass}}" data-status="{{status}}" data-yaml="{{yamlCommand}}">
                             <div class="step-number">{{number}}</div>
                             <div class="step-content">
-                                <div class="step-action">{{action}}</div>
+                                <div class="step-header">
+                                    <div class="step-action">{{actionHtml}}</div>
+                                    {{#if duration_ms}}
+                                    <span class="step-timing">{{duration_ms}}ms</span>
+                                    {{/if}}
+                                    <button class="copy-btn" onclick="copyStep(event, this)" title="Copy YAML">Copy</button>
+                                </div>
                                 <div class="step-result">{{result}}</div>
                                 {{#if screenshot}}
-                                <div class="step-screenshot">
-                                    <img src="{{screenshot}}" alt="Step {{number}}" onclick="openModal(this.src)">
+                                <div class="step-screenshots">
+                                    <div class="screenshot-container">
+                                        <img src="{{screenshot}}" alt="Step {{number}}" onclick="openModal(this.src, {{@index}})" data-index="{{@index}}">
+                                        {{#if tapX}}
+                                        <div class="tap-indicator" style="left: {{tapXPercent}}%; top: {{tapYPercent}}%;"></div>
+                                        {{/if}}
+                                    </div>
                                 </div>
                                 {{/if}}
                             </div>
@@ -533,34 +792,175 @@
         </footer>
     </div>
 
-    <div class="modal" onclick="closeModal()">
-        <span class="modal-close">&times;</span>
+    <div class="modal" onclick="handleModalClick(event)">
+        <span class="modal-close" onclick="closeModal()">&times;</span>
         <img src="" alt="Screenshot">
+        <div class="modal-nav">
+            <button onclick="prevImage(event)">← Previous</button>
+            <span class="modal-counter"></span>
+            <button onclick="nextImage(event)">Next →</button>
+        </div>
     </div>
 
     <script>
+        // Screenshot gallery state
+        let allScreenshots = [];
+        let currentImageIndex = 0;
+
+        // Collect all screenshots on load
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.screenshot-container img').forEach((img, idx) => {
+                allScreenshots.push(img.src);
+                img.dataset.globalIndex = idx;
+            });
+
+            // Expand failed tests by default
+            document.querySelectorAll('.test-item.failed').forEach(item => {
+                item.classList.add('expanded');
+            });
+
+            // Apply syntax highlighting
+            document.querySelectorAll('.step-action').forEach(el => {
+                el.innerHTML = highlightAction(el.textContent);
+            });
+        });
+
+        function highlightAction(text) {
+            const keywords = {
+                'tap:': 'tap',
+                'double_tap:': 'tap',
+                'long_press:': 'tap',
+                'verify_screen:': 'verify',
+                'verify_contains:': 'verify',
+                'verify_no_element:': 'verify',
+                'type:': 'type',
+                'wait:': 'wait',
+                'wait_for:': 'wait',
+                'swipe:': 'swipe',
+                'press:': 'press',
+                'launch_app': 'launch',
+                'terminate_app': 'terminate'
+            };
+
+            for (const [keyword, className] of Object.entries(keywords)) {
+                if (text.startsWith(keyword) || text === keyword.replace(':', '')) {
+                    const parts = text.split(':');
+                    if (parts.length > 1) {
+                        return `<span class="action-keyword ${className}">${parts[0]}:</span>${parts.slice(1).join(':')}`;
+                    }
+                    return `<span class="action-keyword ${className}">${text}</span>`;
+                }
+            }
+            return text;
+        }
+
         function toggleTest(header) {
             const item = header.parentElement;
             item.classList.toggle('expanded');
         }
 
-        function openModal(src) {
+        function openModal(src, index) {
             const modal = document.querySelector('.modal');
-            modal.querySelector('img').src = src;
+            const img = modal.querySelector('img');
+
+            // Find global index
+            const clickedImg = document.querySelector(`img[src="${src}"]`);
+            currentImageIndex = parseInt(clickedImg?.dataset.globalIndex || index || 0);
+
+            img.src = src;
             modal.classList.add('active');
+            updateModalNav();
         }
 
         function closeModal() {
             document.querySelector('.modal').classList.remove('active');
         }
 
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeModal();
+        function handleModalClick(event) {
+            if (event.target.classList.contains('modal')) {
+                closeModal();
+            }
+        }
+
+        function updateModalNav() {
+            const counter = document.querySelector('.modal-counter');
+            const prevBtn = document.querySelector('.modal-nav button:first-child');
+            const nextBtn = document.querySelector('.modal-nav button:last-child');
+
+            counter.textContent = `${currentImageIndex + 1} / ${allScreenshots.length}`;
+            prevBtn.disabled = currentImageIndex === 0;
+            nextBtn.disabled = currentImageIndex === allScreenshots.length - 1;
+        }
+
+        function prevImage(event) {
+            event.stopPropagation();
+            if (currentImageIndex > 0) {
+                currentImageIndex--;
+                document.querySelector('.modal img').src = allScreenshots[currentImageIndex];
+                updateModalNav();
+            }
+        }
+
+        function nextImage(event) {
+            event.stopPropagation();
+            if (currentImageIndex < allScreenshots.length - 1) {
+                currentImageIndex++;
+                document.querySelector('.modal img').src = allScreenshots[currentImageIndex];
+                updateModalNav();
+            }
+        }
+
+        function copyStep(event, btn) {
+            event.stopPropagation();
+            const step = btn.closest('.step');
+            const yaml = step.dataset.yaml || step.querySelector('.step-action').textContent;
+
+            navigator.clipboard.writeText(`- ${yaml}`).then(() => {
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = 'Copy';
+                    btn.classList.remove('copied');
+                }, 1500);
+            });
+        }
+
+        // Filter functionality
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const filter = btn.dataset.filter;
+
+                // Update active button
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                // Filter test items
+                document.querySelectorAll('.test-item').forEach(item => {
+                    if (filter === 'all' || item.dataset.status === filter) {
+                        item.classList.remove('hidden');
+                    } else {
+                        item.classList.add('hidden');
+                    }
+                });
+
+                // Also filter steps within expanded tests
+                document.querySelectorAll('.step').forEach(step => {
+                    if (filter === 'all' || step.dataset.status === filter) {
+                        step.classList.remove('hidden');
+                    } else {
+                        step.classList.add('hidden');
+                    }
+                });
+            });
         });
 
-        // Expand failed tests by default
-        document.querySelectorAll('.test-item.failed').forEach(item => {
-            item.classList.add('expanded');
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (document.querySelector('.modal.active')) {
+                if (e.key === 'Escape') closeModal();
+                if (e.key === 'ArrowLeft') prevImage(e);
+                if (e.key === 'ArrowRight') nextImage(e);
+            }
         });
     </script>
 </body>
