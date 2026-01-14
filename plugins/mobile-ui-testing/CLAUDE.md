@@ -275,6 +275,30 @@ Recording → Checkpoint Detection → Claude Analysis → User Interview → En
 - **Verification**: `verify_screen` uses AI vision to validate screen state
 - **Error handling**: Include available elements list when element not found
 
+## Configuration
+
+### Project Config (`.claude/mobile-ui-testing.yaml`)
+
+```yaml
+model: opus              # AI model: opus, sonnet, haiku
+buffer_interval_ms: 150  # Screenshot capture interval
+verification_recency_ms: 500  # Recency constraint for verification
+```
+
+See `templates/mobile-ui-testing.yaml` for all options.
+
+### Test Config Override
+
+Override settings per-test in YAML:
+
+```yaml
+config:
+  app: com.example.app
+  model: sonnet  # Override for this test only
+```
+
+Priority: Test config > Project config > Defaults
+
 ## Development & Testing
 
 ### Running Integration Tests
