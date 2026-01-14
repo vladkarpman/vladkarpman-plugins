@@ -56,6 +56,8 @@ scripts/
 ├── analyze-checkpoints.py   # Detect verification checkpoints
 ├── analyze-typing.py        # Detect keyboard typing sequences
 ├── generate-test.py         # YAML generation with verifications and typing
+├── generate-report.py       # JSON→HTML report generator
+├── load-config.py           # Load merged configuration
 ├── check-ffmpeg.sh          # Verifies ffmpeg is installed
 ├── record-video.sh          # adb screenrecord wrapper with error handling
 ├── monitor-touches.py       # Captures touch events via adb getevent
@@ -266,6 +268,34 @@ Recording → Checkpoint Detection → Claude Analysis → User Interview → En
 - No API keys needed - uses Claude Code's conversation flow
 
 **Design:** See `docs/plans/2026-01-13-verification-interview-design.md`
+
+## Report Generation
+
+Reports are enabled by default. Use `--no-report` flag to skip.
+
+**Report structure:**
+```
+tests/reports/{YYYY-MM-DD}_{test-name}/
+├── report.json          # Source of truth (JSON)
+├── report.html          # Generated view (HTML)
+└── screenshots/
+    ├── step_001.png
+    ├── step_002.png
+    └── ...
+```
+
+**Configuration** (in `.claude/mobile-ui-testing.yaml`):
+```yaml
+generate_reports: true    # Default: true
+screenshots: all          # all | failures | none
+```
+
+**Manual report generation:**
+```bash
+python3 scripts/generate-report.py tests/reports/{name}/report.json
+```
+
+**Design:** See `docs/plans/2026-01-14-report-generation-design.md`
 
 ## Key Conventions
 
