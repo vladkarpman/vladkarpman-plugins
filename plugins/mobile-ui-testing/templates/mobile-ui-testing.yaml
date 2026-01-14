@@ -18,3 +18,13 @@ buffer_max_screenshots: 200
 # Screenshots must be within this time OR be most recent
 # Default: 500
 verification_recency_ms: 500
+
+# Report generation (default: true)
+# Set to false to disable automatic report generation
+generate_reports: true
+
+# Screenshot capture mode for reports
+# - all: Capture after every step (default)
+# - failures: Only capture on failed steps
+# - none: No screenshots in reports
+screenshots: all

@@ -25,7 +25,9 @@ DEFAULTS = {
     "model": "opus",
     "buffer_interval_ms": 150,
     "buffer_max_screenshots": 200,
-    "verification_recency_ms": 500
+    "verification_recency_ms": 500,
+    "generate_reports": True,
+    "screenshots": "all"  # all | failures | none
 }
 
 
@@ -57,10 +59,15 @@ def extract_test_config(test_yaml: Dict[str, Any]) -> Dict[str, Any]:
     """Extract config section from test YAML."""
     config = test_yaml.get("config", {})
     # Only return keys that are configuration, not test-specific like 'app'
-    return {
-        k: v for k, v in config.items()
-        if k in ["model", "buffer_interval_ms", "verification_recency_ms"]
-    }
+    config_keys = [
+        "model",
+        "buffer_interval_ms",
+        "buffer_max_screenshots",
+        "verification_recency_ms",
+        "generate_reports",
+        "screenshots"
+    ]
+    return {k: v for k, v in config.items() if k in config_keys}
 
 
 def merge_configs(
