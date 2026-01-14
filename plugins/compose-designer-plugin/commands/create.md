@@ -33,6 +33,35 @@ Generate Jetpack Compose code from design input with automated validation and de
 
 ## Instructions for Claude
 
+### Phase Structure (Overview)
+
+**Phase 0: Setup and Validation**
+- Load configuration
+- Validate arguments and dependencies
+- Create task list
+
+**Phase 1: Input Processing**
+- If Figma URL: Extract tokens via Figma MCP
+- If Screenshot: Use as baseline directly
+- Create temp directory
+
+**Phase 2: Code Generation**
+- Invoke design-generator agent
+- Pass Figma tokens if available
+- Output: Generated .kt file
+
+**Phase 3: Device Validation** (visual-validator agent)
+- Device-centric loop:
+  - Build → Deploy → Screenshot → Compare → Refine
+- Continue until SSIM ≥ threshold or max iterations
+- Output: Validated .kt file + screenshots
+
+**Phase 4: Final Report**
+- Summarize results
+- Offer commit option
+
+---
+
 ### Phase 0: Setup and Validation
 
 **Step 1: Load configuration**
@@ -83,12 +112,11 @@ Use TodoWrite to create workflow tasks:
 
 ```json
 [
-  {"content": "Load configuration and validate inputs", "status": "in_progress", "activeForm": "Loading configuration and validating inputs"},
-  {"content": "Process design input (Phase 0)", "status": "pending", "activeForm": "Processing design input"},
-  {"content": "Generate initial Compose code (Phase 1)", "status": "pending", "activeForm": "Generating initial Compose code"},
-  {"content": "Visual validation with ralph-wiggum (Phase 2)", "status": "pending", "activeForm": "Running visual validation"},
-  {"content": "Device testing with mobile-mcp (Phase 3)", "status": "pending", "activeForm": "Testing on device"},
-  {"content": "Generate final report", "status": "pending", "activeForm": "Generating final report"}
+  {"content": "Load configuration and validate inputs", "status": "pending", "activeForm": "Loading configuration"},
+  {"content": "Process input and extract Figma tokens (if URL)", "status": "pending", "activeForm": "Processing input"},
+  {"content": "Generate initial Compose code", "status": "pending", "activeForm": "Generating code"},
+  {"content": "Device validation loop (SSIM + LLM vision)", "status": "pending", "activeForm": "Validating on device"},
+  {"content": "Generate final report", "status": "pending", "activeForm": "Generating report"}
 ]
 ```
 
@@ -219,59 +247,88 @@ fi
 
 **Step 4: Update todo**
 
-Mark "Generate initial Compose code" as completed, start "Visual validation".
+Mark "Generate initial Compose code" as completed, start "Device validation loop".
 
-### Phase 3: Visual Validation (visual-validator agent)
+### Phase 3: Device Validation (visual-validator agent)
 
-**Step 1: Check ralph-wiggum availability**
+The visual-validator agent performs device-centric validation: deploy to device, capture screenshots, compare with SSIM + LLM vision, and iterate until threshold is reached.
+
+**Step 1: Check device availability**
 
 ```bash
-# Check if ralph-wiggum plugin is available
-claude --help | grep -q "ralph-loop" || {
-  echo "⚠️  Ralph-wiggum plugin not found"
-  echo "Install: https://github.com/anthropics/ralph-wiggum-plugin"
+# Check if mobile-mcp tools available
+claude --help | grep -q "mobile_list_available_devices" || {
+  echo "⚠️  Mobile-mcp plugin not found"
+  echo "Install: https://github.com/mobile-dev-inc/mobile-mcp"
   read -p "Skip validation phase? [y/N]: " skip
   [ "$skip" = "y" ] && return 0
 }
+
+# List available devices
+devices=$(mobile_list_available_devices)
+if [ -z "$devices" ]; then
+  echo "❌ No Android devices found"
+  echo ""
+  echo "Connect a device:"
+  echo "  • Physical: Enable USB debugging"
+  echo "  • Emulator: Launch from Android Studio"
+  read -p "Skip validation phase? [y/N]: " skip
+  [ "$skip" = "y" ] && return 0
+  exit 1
+fi
 ```
 
 **Step 2: Invoke visual-validator agent**
 
-Use Task tool with ralph-wiggum integration:
+Use Task tool:
 
 ```
 Task tool:
   subagent_type: "compose-designer:visual-validator"
-  description: "Validate UI visual accuracy"
-  prompt: "Refine Compose code in {output_file_path} to match baseline {baseline_path}.
+  description: "Validate UI on device"
+  prompt: "Validate Compose code in {output_file_path} against baseline {baseline_path}.
 
-  Validation:
-  - Target similarity: {config.validation.visual_similarity_threshold}
-  - Max iterations: {config.validation.max_ralph_iterations}
-  - Preview delay: {config.validation.preview_screenshot_delay}
+  Inputs:
+  - kotlin_file_path: {output_file_path}
+  - baseline_image_path: {baseline_path}
+  - package_name: {config.output.package_base}
+  - temp_dir: {temp_dir}
+  - threshold: {config.validation.visual_similarity_threshold}
+  - max_iterations: {config.validation.max_ralph_iterations}
 
-  Use ralph-wiggum loop to iteratively improve until similarity threshold reached.
-  Save preview screenshots and diffs to: {temp_dir}/"
+  The agent will:
+  1. Build APK and deploy to device
+  2. Capture device screenshot
+  3. Compare with SSIM (threshold: 0.92)
+  4. If below threshold: analyze with LLM vision, apply fixes, repeat
+  5. Return when threshold reached or max iterations
+
+  Save screenshots and diffs to: {temp_dir}/"
 ```
 
 **Step 3: Review validation results**
 
-Agent will return:
-- Final similarity score
-- Iteration count
-- Status (PASS/WARNING/FAIL)
-- Diff image paths
+Agent will return JSON:
+```json
+{
+  "status": "SUCCESS|STUCK|MAX_ITERATIONS",
+  "final_similarity": 0.93,
+  "iterations": 4,
+  "screenshots": ["iteration-1.png", ...],
+  "diff_images": ["diff-1.png", ...]
+}
+```
 
 **Step 4: Handle validation outcome**
 
-If similarity < threshold:
+If status is STUCK or MAX_ITERATIONS:
 ```
-Ask user: "Visual validation incomplete. Similarity: {score} (target: {threshold}).
+Ask user: "Visual validation incomplete. Similarity: {final_similarity} (target: {threshold}).
 
 Options:
-1. Continue to device testing (accept current quality)
+1. Accept current result and continue
 2. Manual refinement (I'll help you improve the code)
-3. Adjust threshold (change config and retry)
+3. Adjust threshold and retry
 4. Abort workflow
 
 What would you like to do? [1/2/3/4]: "
@@ -279,83 +336,9 @@ What would you like to do? [1/2/3/4]: "
 
 **Step 5: Update todo**
 
-Mark "Visual validation" as completed, start "Device testing".
+Mark "Device validation loop" as completed, start "Generate final report".
 
-### Phase 4: Device Testing (device-tester agent)
-
-**Step 1: Check mobile-mcp availability**
-
-```bash
-# Check if mobile-mcp tools available
-claude --help | grep -q "mobile_list_available_devices" || {
-  echo "⚠️  Mobile-mcp plugin not found"
-  echo "Install: https://github.com/anthropics/mobile-ui-testing"
-  read -p "Skip device testing? [y/N]: " skip
-  [ "$skip" = "y" ] && return 0
-}
-```
-
-**Step 2: Check device availability**
-
-```bash
-# List available devices
-devices=$(mobile_list_available_devices)
-device_count=$(echo "$devices" | wc -l)
-
-if [ "$device_count" -eq 0 ]; then
-  echo "❌ No Android devices found"
-  echo ""
-  echo "Connect a device:"
-  echo "  • Physical: Enable USB debugging"
-  echo "  • Emulator: Launch from Android Studio"
-  echo ""
-  read -p "Skip device testing? [y/N]: " skip
-  [ "$skip" = "y" ] && return 0
-  exit 1
-fi
-```
-
-**Step 3: Invoke device-tester agent**
-
-Use Task tool:
-
-```
-Task tool:
-  subagent_type: "compose-designer:device-tester"
-  description: "Test UI on device"
-  prompt: "Test generated Compose component in {output_file_path} on Android device.
-
-  Config:
-  - Test package: {config.testing.test_activity_package}
-  - Test activity: {config.testing.test_activity_name}
-  - Device ID: {config.testing.device_id}
-  - Device override (CLI): {device_argument or 'none'}
-  - Interaction depth: {config.testing.interaction_depth}
-
-  Steps:
-  1. Generate test activity
-  2. Build and install APK
-  3. Launch and capture screenshot
-  4. Test interactions (buttons, fields, etc.)
-  5. Clean up test activity
-
-  Compare device screenshot with baseline: {baseline_path}
-  Save artifacts to: {temp_dir}/"
-```
-
-**Step 4: Review testing results**
-
-Agent will return:
-- Device similarity score
-- Interaction test results (passed/failed)
-- Any runtime issues
-- Screenshot paths
-
-**Step 5: Update todo**
-
-Mark "Device testing" as completed, start "Generate final report".
-
-### Phase 5: Final Report and Commit
+### Phase 4: Final Report and Commit
 
 **Step 1: Generate comprehensive report**
 
@@ -366,26 +349,20 @@ Compile results from all phases:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📥 Phase 1: Code Generation
+📥 Phase 2: Code Generation
 ✓ Input: {input_source}
 ✓ Baseline: {baseline_path}
 ✓ Generated: {output_file_path}
 ✓ Lines of code: {loc}
-✓ Components: {component_count}
+✓ Figma tokens: {used_figma_tokens ? "✓ Extracted" : "N/A (screenshot input)"}
 
-🎨 Phase 2: Visual Validation
-✓ Method: Ralph-wiggum loop
+📱 Phase 3: Device Validation
+✓ Method: Device-centric (SSIM + LLM vision)
 ✓ Iterations: {iteration_count}/{max_iterations}
 ✓ Final similarity: {similarity_score:.2%} (target: {threshold:.2%})
-✓ Status: {PASS/WARNING}
-{if WARNING: "⚠️  Similarity below threshold but acceptable"}
-
-📱 Phase 3: Device Testing
+✓ Status: {status}
 ✓ Device: {device_name}
-✓ Runtime similarity: {device_similarity:.2%}
-✓ Interactions tested: {interaction_count}
-✓ Interactions passed: {passed_count}/{interaction_count}
-{if failures: "⚠️  Failed: {failed_interactions}"}
+{if status != "SUCCESS": "⚠️  {status}: Manual review recommended"}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -393,9 +370,8 @@ Compile results from all phases:
   • Component: {output_file_path}
   • Baseline: {baseline_path}
   • Artifacts: {temp_dir}/
-    - preview-iteration-*.png
-    - diff-iteration-*.png
-    - device-screenshot.png
+    - iteration-*.png (device screenshots)
+    - diff-*.png (difference visualizations)
 
 📋 Next Steps:
   [ ] Review generated code
@@ -449,9 +425,8 @@ Generated using compose-designer plugin:
 - Device tested: ✓ ({device_name})
 - Interactions: {passed_count}/{interaction_count} passed
 
-Phase 1: Code generation
-Phase 2: Visual validation ({iteration_count} iterations)
-Phase 3: Device testing"
+Code generation: Complete
+Device validation: {iteration_count} iterations, {similarity_score:.1%} similarity"
 ```
 
 **Step 4: Mark all todos complete**
