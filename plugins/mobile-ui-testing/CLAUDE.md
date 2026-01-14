@@ -18,11 +18,29 @@ claude --plugin-dir /path/to/mobile-ui-testing
 
 No build/compile step - pure markdown commands.
 
-## Python Dependencies
+## Dependencies
 
-### Core Dependencies (Python 3.9+)
+### device-manager-mcp (Recommended)
 
-For verification interview and checkpoint detection:
+For high-performance screenshot and touch injection (~50ms vs ~500ms):
+
+```bash
+# Install uv (Python package runner, like npx for Python)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Restart Claude Code after installation
+```
+
+The plugin automatically uses device-manager-mcp via `uvx` when available. If uv is not installed, it falls back to mobile-mcp (slower but functional).
+
+**Benefits of device-manager-mcp:**
+- **~50ms** screenshot latency (vs 500-2000ms with mobile-mcp)
+- **~50ms** tap/swipe latency (vs 200-300ms with mobile-mcp)
+- **No bundled dependencies** - runs via uvx on demand
+
+### Python Dependencies (Optional)
+
+For verification interview and checkpoint detection during `/stop-recording`:
 
 ```bash
 pip3 install -r scripts/requirements.txt
@@ -33,30 +51,7 @@ Required packages:
 - `imagehash` - Perceptual hashing for screen change detection
 - `numpy` - Array processing
 
-**Note:** These are only needed for the verification interview feature during `/stop-recording`. Basic test creation and execution work without these dependencies.
-
-### scrcpy-helper Dependencies (Python 3.12+ required)
-
-For high-performance screenshot and touch injection via scrcpy 3.x:
-
-```bash
-# Install scrcpy CLI (macOS)
-brew install scrcpy
-
-# Create Python 3.12+ virtual environment for scrcpy-helper
-cd scripts/scrcpy_helper
-python3.12 -m venv .venv
-.venv/bin/pip install mysc Pillow imagehash numpy adbutils
-```
-
-**Benefits of scrcpy-helper:**
-- **~45 FPS** continuous frame buffer (vs one-shot screenshots)
-- **~10ms** screenshot latency (vs 500-2000ms with adb)
-- **~10ms** touch injection (vs 200-300ms with adb)
-- **2 second frame history** for analyzing before/after touch
-- **Screen stability detection** using perceptual hashing
-
-**Note:** If scrcpy-helper is not available, the plugin gracefully falls back to mobile-mcp (adb-based). The venv is auto-detected by session hooks.
+**Note:** These are only needed for the verification interview feature. Basic test creation and execution work without these dependencies.
 
 ## Architecture
 
@@ -89,18 +84,7 @@ scripts/
 ├── monitor-touches.py       # Captures touch events via adb getevent
 ├── extract-frames.py        # Extracts frames from video at touch timestamps
 ├── parse-touches.py         # Parses raw touch events into gestures (legacy)
-├── record-touches.sh        # Touch capture script (legacy)
-├── scrcpy-helper.py         # Entry point for scrcpy-helper server
-├── scrcpy-client.sh         # Bash client for scrcpy-helper commands
-├── scrcpy-or-mcp.sh         # Fallback wrapper (scrcpy → mobile-mcp)
-└── scrcpy_helper/           # scrcpy-helper package (Python 3.12+)
-    ├── .venv/               # Virtual environment with MYScrcpy
-    ├── __init__.py
-    ├── server.py            # Unix socket server
-    ├── client.py            # MYScrcpy connection management
-    ├── frame_buffer.py      # Circular frame buffer with stability detection
-    ├── commands.py          # Command handlers (screenshot, tap, etc.)
-    └── video.py             # Video recording to MP4
+└── record-touches.sh        # Touch capture script (legacy)
 
 templates/            # Example YAML templates (reference only, not used by commands)
 tests/                # Generated test files (gitignored)
@@ -125,80 +109,76 @@ agents/               # Specialized subagents for advanced workflows
 
 **Key processing flow:**
 ```
-User Action → Command (markdown) → Python/Bash Script → mobile-mcp tool → Device
+User Action → Command (markdown) → device-manager-mcp tool (fast) → Device
+                                 → mobile-mcp tool (fallback)      → Device
            ↓
     AskUserQuestion (for interviews)
            ↓
     Write YAML test file
 ```
 
-## scrcpy-helper Architecture
+## MCP Server Architecture
 
-High-performance screenshot and input injection server using [scrcpy](https://github.com/Genymobile/scrcpy) 3.x via [MYScrcpy](https://github.com/me2sy/MYScrcpy).
+The plugin uses two MCP servers for device interaction:
 
-### Lifecycle
+### device-manager-mcp (Preferred - Fast)
 
-1. **Session Start**: `hooks/session-start.sh` auto-starts scrcpy-helper server
-2. **Runtime**: Server listens on `/tmp/scrcpy-helper.sock`
-3. **Session End**: `hooks/session-end.sh` gracefully stops the server
+High-performance device interaction via scrcpy. Runs via `uvx` (requires `uv` installed).
 
-### Commands
+**Tools provided:**
+| Tool | Description |
+|------|-------------|
+| `device_list` | List connected devices |
+| `device_screen_size` | Get screen dimensions |
+| `device_screenshot` | Take screenshot (~50ms) |
+| `device_tap` | Tap at coordinates (~50ms) |
+| `device_swipe` | Swipe gesture |
+| `device_type` | Type text |
+| `device_press_key` | Press key (BACK, HOME, ENTER) |
 
-```bash
-# Via socket (from shell)
-echo "connect DEVICE_ID" | nc -U /tmp/scrcpy-helper.sock
-echo "screenshot base64" | nc -U /tmp/scrcpy-helper.sock
-echo "tap 540 1200" | nc -U /tmp/scrcpy-helper.sock
-echo "status" | nc -U /tmp/scrcpy-helper.sock
-
-# Via wrapper script
-./scripts/scrcpy-or-mcp.sh screenshot /tmp/screen.png
-./scripts/scrcpy-or-mcp.sh tap 540 1200
-./scripts/scrcpy-or-mcp.sh status
+**Configuration** (`.mcp.json`):
+```json
+{
+  "device-manager": {
+    "command": "uvx",
+    "args": ["device-manager-mcp"]
+  }
+}
 ```
 
-### Available Commands
+### mobile-mcp (Fallback + Additional Features)
 
-| Command | Description |
-|---------|-------------|
-| `connect [device_id]` | Connect to device via scrcpy |
-| `disconnect` | Disconnect from device |
-| `status` | Get server and connection status (JSON) |
-| `screenshot [base64]` | Take screenshot (PNG or base64) |
-| `tap <x> <y>` | Tap at coordinates |
-| `longpress <x> <y> [ms]` | Long press at coordinates |
-| `swipe <x1> <y1> <x2> <y2>` | Swipe between points |
-| `type <text>` | Type text (via clipboard paste) |
-| `key <keycode>` | Send keycode (back, home, enter) |
-| `frames stable [ms]` | Wait for screen to stabilize |
-| `frames recent <n>` | Get last N frames as ZIP |
-| `record start\|stop` | Video recording control |
-| `quit` | Shutdown server |
+Standard device interaction via adb. Runs via `npx`.
 
-### Fallback Mechanism
+**Used for:**
+- `mobile_list_elements_on_screen` - UI element discovery (device-manager doesn't have this)
+- `mobile_launch_app` / `mobile_terminate_app` - App lifecycle
+- `mobile_set_orientation` - Screen orientation
+- Fallback when device-manager is unavailable
 
-`scrcpy-or-mcp.sh` automatically falls back to mobile-mcp when:
-- scrcpy-helper socket doesn't exist
-- `PREFER_MCP=1` environment variable set
-- scrcpy-helper returns error
+**Configuration** (`.mcp.json`):
+```json
+{
+  "mobile-mcp": {
+    "command": "npx",
+    "args": ["-y", "@mobilenext/mobile-mcp@latest"]
+  }
+}
+```
 
-### Troubleshooting scrcpy-helper
+### Troubleshooting MCP Servers
 
 ```bash
-# Check if server is running
-ls -la /tmp/scrcpy-helper.sock
+# Check if uv is installed (required for device-manager)
+uvx --version
 
-# Check server status
-echo "status" | nc -U /tmp/scrcpy-helper.sock
+# Install uv if missing
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Manually start server
-scripts/scrcpy_helper/.venv/bin/python3 scripts/scrcpy-helper.py
+# Check adb connection (required for both)
+adb devices
 
-# Check MYScrcpy installation
-scripts/scrcpy_helper/.venv/bin/python3 -c "from myscrcpy.core import Session; print('OK')"
-
-# Check scrcpy version (requires 3.x)
-scrcpy --version
+# Restart Claude Code after installing uv
 ```
 
 ## Command Frontmatter Pattern
@@ -417,8 +397,8 @@ python3 scripts/generate-report.py tests/reports/{name}/report.json
 
 ```yaml
 model: opus              # AI model: opus, sonnet, haiku
-buffer_interval_ms: 150  # Screenshot capture interval
-verification_recency_ms: 500  # Recency constraint for verification
+generate_reports: true   # Generate HTML reports (default: true)
+screenshots: all         # Screenshot mode: all | failures | none
 ```
 
 See `templates/mobile-ui-testing.yaml` for all options.
@@ -655,7 +635,7 @@ allowed-tools:
 
 Implementation details and architectural decisions documented in `docs/plans/`:
 
-- **scrcpy-helper-design.md** - High-performance screenshot/input server using scrcpy 3.x
+- **remove-scrcpy-helper-design.md** - Migration from scrcpy-helper to device-manager-mcp
 - **conditional-logic-implementation.md** - Conditional operators design (if_exists, if_screen, etc.)
 - **verification-interview-design.md** - AI-guided verification workflow and checkpoint detection
 - **keyboard-typing-detection.md** - Typing detection heuristics and interview flow

@@ -7,7 +7,7 @@ allowed-tools:
   - Write
   - Bash
   - Glob
-  # device-manager-mcp (fast path via scrcpy)
+  # device-manager-mcp (fast path - PREFERRED for performance-critical operations)
   - mcp__device-manager__device_list
   - mcp__device-manager__device_screen_size
   - mcp__device-manager__device_screenshot
@@ -15,24 +15,25 @@ allowed-tools:
   - mcp__device-manager__device_swipe
   - mcp__device-manager__device_type
   - mcp__device-manager__device_press_key
-  # mobile-mcp (fallback and additional features)
+  # mobile-mcp (for features device-manager doesn't have + fallback)
   - mcp__mobile-mcp__mobile_list_available_devices
   - mcp__mobile-mcp__mobile_list_apps
   - mcp__mobile-mcp__mobile_launch_app
   - mcp__mobile-mcp__mobile_terminate_app
-  - mcp__mobile-mcp__mobile_get_screen_size
-  - mcp__mobile-mcp__mobile_click_on_screen_at_coordinates
+  - mcp__mobile-mcp__mobile_list_elements_on_screen
   - mcp__mobile-mcp__mobile_double_tap_on_screen
   - mcp__mobile-mcp__mobile_long_press_on_screen_at_coordinates
-  - mcp__mobile-mcp__mobile_list_elements_on_screen
-  - mcp__mobile-mcp__mobile_press_button
   - mcp__mobile-mcp__mobile_open_url
-  - mcp__mobile-mcp__mobile_swipe_on_screen
-  - mcp__mobile-mcp__mobile_type_keys
-  - mcp__mobile-mcp__mobile_take_screenshot
-  - mcp__mobile-mcp__mobile_save_screenshot
   - mcp__mobile-mcp__mobile_set_orientation
   - mcp__mobile-mcp__mobile_get_orientation
+  # mobile-mcp fallback tools (use only if device-manager unavailable)
+  - mcp__mobile-mcp__mobile_get_screen_size
+  - mcp__mobile-mcp__mobile_click_on_screen_at_coordinates
+  - mcp__mobile-mcp__mobile_swipe_on_screen
+  - mcp__mobile-mcp__mobile_type_keys
+  - mcp__mobile-mcp__mobile_press_button
+  - mcp__mobile-mcp__mobile_take_screenshot
+  - mcp__mobile-mcp__mobile_save_screenshot
 ---
 
 # Run Test - Execute YAML Test
@@ -96,8 +97,6 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/load-config.py" --test-config "{TEST_FILE
 
 Parse JSON output. Store:
 - `{CONFIG_MODEL}` = model (default: opus)
-- `{BUFFER_INTERVAL}` = buffer_interval_ms (default: 150)
-- `{VERIFICATION_RECENCY}` = verification_recency_ms (default: 500)
 - `{GENERATE_REPORTS}` = generate_reports (default: true)
 - `{SCREENSHOT_MODE}` = screenshots (default: "all") - options: all, failures, none
 
@@ -128,22 +127,6 @@ Initialize report data:
   tests: []
 }
 ```
-
-### Step 5.6: Start Screenshot Buffer
-
-**Tool:** `Bash` to start buffer in background:
-```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/screenshot-buffer.py" \
-  --device "{DEVICE_ID}" \
-  --output "/tmp/mobile-ui-testing-buffer-$(date +%s)" \
-  --interval {BUFFER_INTERVAL} &
-echo $!
-```
-
-Store:
-- `{BUFFER_PID}` = process ID from output
-- `{BUFFER_DIR}` = the output path used
-- `{LAST_ACTION_TIMESTAMP}` = current time (initialize)
 
 ### Step 6: Execute Setup
 
@@ -193,7 +176,7 @@ For each test in `{TESTS}`:
    ```bash
    {SCREENSHOT_PATH} = "{REPORT_DIR}/screenshots/step_{STEP_COUNTER:03d}.png"
    ```
-   **Tool:** `mcp__mobile-mcp__mobile_save_screenshot` with saveTo={SCREENSHOT_PATH}
+   **Tool:** `mcp__device-manager__device_screenshot` (fast, preferred) or `mcp__mobile-mcp__mobile_save_screenshot` (fallback) with path={SCREENSHOT_PATH}
 
    **Record step in report:**
    ```
@@ -211,8 +194,6 @@ For each test in `{TESTS}`:
      - Record failure details in `{CURRENT_TEST}.failure`
      - Stop this test (don't continue steps)
 
-**Important:** After executing any action (tap, swipe, type, press, wait, etc.), update:
-- `{LAST_ACTION_TIMESTAMP}` = current time
 
 4. **Finalize test:**
    ```
@@ -239,19 +220,6 @@ For each step in `{TEARDOWN_STEPS}`:
 - Output: `  [teardown] {action} ✓`
 
 **Always run teardown**, even if tests failed.
-
-### Step 8.5: Stop Screenshot Buffer
-
-**Tool:** `Bash` to stop buffer:
-```bash
-kill {BUFFER_PID} 2>/dev/null || true
-```
-
-**On test failure:** Keep `{BUFFER_DIR}` for debugging, include path in failure output.
-**On test pass:** Clean up:
-```bash
-rm -rf {BUFFER_DIR}
-```
 
 ### Step 9: Show Summary
 
@@ -310,15 +278,30 @@ rm -rf {BUFFER_DIR}
 
 ## Action Mapping
 
-**Tool Priority:** Use device-manager tools (fast) when available, fall back to mobile-mcp.
+**Tool Priority:** ALWAYS try device-manager tools first (fast, ~50ms). Only fall back to mobile-mcp if device-manager fails or is unavailable.
+
+**Device-Manager Tools (preferred):**
+- `mcp__device-manager__device_tap` - Fast tap (~50ms)
+- `mcp__device-manager__device_swipe` - Fast swipe
+- `mcp__device-manager__device_type` - Fast text input
+- `mcp__device-manager__device_screenshot` - Fast screenshot (~50ms)
+- `mcp__device-manager__device_press_key` - Key events (BACK, HOME, ENTER)
+- `mcp__device-manager__device_screen_size` - Get screen dimensions
+
+**Mobile-MCP Tools (for features device-manager doesn't have):**
+- `mcp__mobile-mcp__mobile_list_elements_on_screen` - UI element discovery (device-manager doesn't have this)
+- `mcp__mobile-mcp__mobile_launch_app` - App lifecycle
+- `mcp__mobile-mcp__mobile_terminate_app` - App lifecycle
+- `mcp__mobile-mcp__mobile_list_available_devices` - Device discovery
+- `mcp__mobile-mcp__mobile_set_orientation` - Screen orientation
 
 ### Tap Actions
 
 | YAML | Tool | Parameters |
 |------|------|------------|
-| `tap: "Button"` | Find element via `mobile_list_elements_on_screen`, then `device_tap` | x, y of element |
+| `tap: "Button"` | Find element via `mcp__mobile-mcp__mobile_list_elements_on_screen`, then `mcp__device-manager__device_tap` | x, y of element center |
 | `tap: [100, 200]` | `mcp__device-manager__device_tap` | x=100, y=200 |
-| `tap: ["50%", "80%"]` | Calculate then `mcp__device-manager__device_tap` | x=width*0.5, y=height*0.8 |
+| `tap: ["50%", "80%"]` | Calculate pixels, then `mcp__device-manager__device_tap` | x=width×0.5, y=height×0.8 |
 
 ### Finding Elements
 
@@ -334,57 +317,37 @@ When action uses element text (e.g., `tap: "Login"`):
 
 | YAML | Tool |
 |------|------|
-| `double_tap: "X"` | Find element → `mobile_double_tap_on_screen` |
-| `long_press: "X"` | Find element → `mobile_long_press_on_screen_at_coordinates` |
+| `double_tap: "X"` | Find element → `mcp__mobile-mcp__mobile_double_tap_on_screen` |
+| `long_press: "X"` | Find element → `mcp__mobile-mcp__mobile_long_press_on_screen_at_coordinates` |
 | `type: "text"` | `mcp__device-manager__device_type` with text |
-| `type: {text: "X", submit: true}` | `device_type` then `device_press_key` ENTER |
+| `type: {text: "X", submit: true}` | `mcp__device-manager__device_type` then `mcp__device-manager__device_press_key` key="ENTER" |
 | `swipe: up` | `mcp__device-manager__device_swipe` direction="up" |
-| `swipe: {direction: up, distance: 500}` | `device_swipe` with distance |
+| `swipe: {direction: up, distance: 500}` | `mcp__device-manager__device_swipe` with distance |
 | `press: back` | `mcp__device-manager__device_press_key` key="BACK" |
-| `press: home` | `device_press_key` key="HOME" |
-| `wait: 2s` | Pause for 2 seconds |
-| `launch_app` | `mobile_launch_app` with config.app |
-| `terminate_app` | `mobile_terminate_app` with config.app |
-| `screenshot: "name"` | `mcp__device-manager__device_screenshot` |
-| `set_orientation: landscape` | `mobile_set_orientation` |
-| `open_url: "https://..."` | `mobile_open_url` |
+| `press: home` | `mcp__device-manager__device_press_key` key="HOME" |
+| `press: enter` | `mcp__device-manager__device_press_key` key="ENTER" |
+| `wait: 2s` | Pause for 2 seconds (no tool call needed) |
+| `launch_app` | `mcp__mobile-mcp__mobile_launch_app` with config.app |
+| `terminate_app` | `mcp__mobile-mcp__mobile_terminate_app` with config.app |
+| `screenshot: "name"` | `mcp__device-manager__device_screenshot` with path |
+| `set_orientation: landscape` | `mcp__mobile-mcp__mobile_set_orientation` |
+| `open_url: "https://..."` | `mcp__mobile-mcp__mobile_open_url` |
 
 ### Verification Actions
 
 | YAML | Execution |
 |------|-----------|
-| `verify_screen: "X"` | Query buffer → AI analysis → pass if matches description |
+| `verify_screen: "X"` | Take screenshot → AI analysis → pass if matches description |
 | `verify_contains: "X"` | List elements → pass if element with text X exists |
 | `verify_no_element: "X"` | List elements → pass if element with text X NOT found |
 
-#### verify_screen with Buffer
+#### verify_screen Implementation
 
-1. **Tool:** `Bash` - Query buffer for candidates:
-   ```bash
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/verify-from-buffer.py" \
-     --buffer "{BUFFER_DIR}" \
-     --since {LAST_ACTION_TIMESTAMP} \
-     --recency {VERIFICATION_RECENCY}
-   ```
+1. **Tool:** `mcp__device-manager__device_screenshot` (fast, ~50ms) or `mcp__mobile-mcp__mobile_take_screenshot` (fallback)
 
-2. Parse JSON output. Get `recommended` screenshot path.
-
-3. **If no candidates (buffer unavailable):** Fall back to device-manager:
-   - **Tool:** `mcp__device-manager__device_screenshot`
-   - Use that screenshot for analysis
-
-4. **Tool:** `Read` the recommended screenshot image
-
-5. **AI Analysis:** Examine the image and determine if it matches the expected state description.
+2. **AI Analysis:** Examine the screenshot and determine if it matches the expected state description.
    - If matches: PASS
-   - If doesn't match: Check other candidates from buffer
-   - If none match: FAIL
-
-6. **On failure:** Include in error output:
-   ```
-   Checked {total_since_action} screenshots from buffer
-   Screenshots preserved: {BUFFER_DIR}
-   ```
+   - If doesn't match: FAIL with description of what was actually seen
 
 ### Conditional Actions
 
@@ -412,7 +375,7 @@ Conditionals check current state and execute branches accordingly.
    - Check condition against elements
 
    **For `if_screen`:**
-   - **Tool:** `mcp__device-manager__device_screenshot`
+   - **Tool:** `mcp__device-manager__device_screenshot` (preferred) or `mcp__mobile-mcp__mobile_take_screenshot` (fallback)
    - Analyze screenshot with AI vision (same logic as `verify_screen`)
    - Check if screen matches description
 
