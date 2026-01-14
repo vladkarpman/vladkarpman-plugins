@@ -443,8 +443,46 @@ def register_device_commands(server: "ScrcpyHelperServer") -> None:
     server.register_command("clipboard", cmd_clipboard)
 
 
+def register_video_commands(server: "ScrcpyHelperServer") -> None:
+    """Register video recording commands."""
+
+    def cmd_record(args: list[str]) -> str:
+        """Video recording control. Usage: record <start|stop|status> [filename]"""
+        if not args:
+            return "ERROR: usage: record <start|stop|status> [filename]"
+
+        subcmd = args[0].lower()
+
+        if subcmd == "start":
+            if not server.scrcpy.connected:
+                return "ERROR: not connected"
+
+            if server.scrcpy.video_recorder.start():
+                return "OK"
+            else:
+                return "ERROR: already recording"
+
+        elif subcmd == "stop":
+            filename = args[1] if len(args) > 1 else None
+            result = server.scrcpy.video_recorder.stop(filename)
+            if result:
+                return result
+            else:
+                return "ERROR: no recording or save failed"
+
+        elif subcmd == "status":
+            status = server.scrcpy.video_recorder.get_status()
+            return json.dumps(status)
+
+        else:
+            return f"ERROR: unknown record command '{subcmd}'"
+
+    server.register_command("record", cmd_record)
+
+
 def register_all_commands(server: "ScrcpyHelperServer") -> None:
     """Register all command handlers."""
     register_screenshot_commands(server)
     register_input_commands(server)
     register_device_commands(server)
+    register_video_commands(server)

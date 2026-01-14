@@ -10,6 +10,7 @@ from typing import Callable, Optional
 import numpy as np
 
 from .frame_buffer import FrameBuffer
+from .video import VideoRecorder
 
 try:
     import scrcpy
@@ -37,6 +38,9 @@ class ScrcpyClient:
             max_seconds=max_buffer_seconds
         )
 
+        # Video recorder
+        self.video_recorder = VideoRecorder()
+
     def _log(self, message: str) -> None:
         """Log to stderr."""
         print(f"[scrcpy-client] {message}", file=sys.stderr)
@@ -54,6 +58,9 @@ class ScrcpyClient:
 
         # Add to frame buffer
         self.frame_buffer.add_frame(frame, timestamp)
+
+        # Add to video recorder if recording
+        self.video_recorder.add_frame(frame, timestamp)
 
         # Notify callbacks
         for callback in self._on_frame_callbacks:
