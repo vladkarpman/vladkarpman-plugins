@@ -228,9 +228,38 @@ When action uses element text (e.g., `tap: "Login"`):
 
 | YAML | Execution |
 |------|-----------|
-| `verify_screen: "X"` | Take screenshot → AI analysis → pass if matches description |
+| `verify_screen: "X"` | Query buffer → AI analysis → pass if matches description |
 | `verify_contains: "X"` | List elements → pass if element with text X exists |
 | `verify_no_element: "X"` | List elements → pass if element with text X NOT found |
+
+#### verify_screen with Buffer
+
+1. **Tool:** `Bash` - Query buffer for candidates:
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/verify-from-buffer.py" \
+     --buffer "{BUFFER_DIR}" \
+     --since {LAST_ACTION_TIMESTAMP} \
+     --recency {VERIFICATION_RECENCY}
+   ```
+
+2. Parse JSON output. Get `recommended` screenshot path.
+
+3. **If no candidates (buffer unavailable):** Fall back to mobile-mcp:
+   - **Tool:** `mcp__mobile-mcp__mobile_take_screenshot`
+   - Use that screenshot for analysis
+
+4. **Tool:** `Read` the recommended screenshot image
+
+5. **AI Analysis:** Examine the image and determine if it matches the expected state description.
+   - If matches: PASS
+   - If doesn't match: Check other candidates from buffer
+   - If none match: FAIL
+
+6. **On failure:** Include in error output:
+   ```
+   Checked {total_since_action} screenshots from buffer
+   Screenshots preserved: {BUFFER_DIR}
+   ```
 
 ### Conditional Actions
 
