@@ -8,11 +8,14 @@ import struct
 import sys
 import threading
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Union
 
 from .client import ScrcpyClient
 
 DEFAULT_SOCKET_PATH = "/tmp/scrcpy-helper.sock"
+
+# Response type: either string or ("BINARY", bytes)
+ResponseType = Union[str, tuple]
 
 
 class ScrcpyHelperServer:
@@ -27,13 +30,24 @@ class ScrcpyHelperServer:
         # scrcpy client
         self.scrcpy = ScrcpyClient()
 
-        # Command handlers
-        self.commands: dict[str, Callable[[list[str]], str]] = {
+        # Command handlers - can return str or ("BINARY", bytes)
+        self.commands: dict[str, Callable[[list[str]], ResponseType]] = {
             "status": self._cmd_status,
             "connect": self._cmd_connect,
             "disconnect": self._cmd_disconnect,
             "quit": self._cmd_quit,
         }
+
+        # Register all commands from commands module
+        self._register_all_commands()
+
+    def _register_all_commands(self) -> None:
+        """Register commands from commands module."""
+        try:
+            from .commands import register_all_commands
+            register_all_commands(self)
+        except ImportError as e:
+            self._log(f"Warning: Could not load commands: {e}")
 
     def _log(self, message: str) -> None:
         """Log to stderr (stdout reserved for protocol)."""
@@ -41,7 +55,14 @@ class ScrcpyHelperServer:
 
     def _cmd_status(self, args: list[str]) -> str:
         """Return server status as JSON."""
-        return json.dumps(self.scrcpy.status())
+        status = self.scrcpy.status()
+        # Add frame buffer info
+        status["buffer"] = {
+            "count": self.scrcpy.frame_buffer.get_frame_count(),
+            "duration": round(self.scrcpy.frame_buffer.get_duration(), 3),
+            "fps": round(self.scrcpy.frame_buffer.get_fps(), 1),
+        }
+        return json.dumps(status)
 
     def _cmd_connect(self, args: list[str]) -> str:
         """Connect to device via scrcpy."""
@@ -72,11 +93,16 @@ class ScrcpyHelperServer:
         self.running = False
         return "OK"
 
-    def handle_command(self, command_line: str) -> bytes:
-        """Parse and execute a command, return response bytes."""
+    def handle_command(self, command_line: str) -> tuple[bool, bytes]:
+        """
+        Parse and execute a command.
+
+        Returns:
+            Tuple of (is_binary, response_bytes)
+        """
         command_line = command_line.strip()
         if not command_line:
-            return b"ERROR: empty command\n"
+            return False, b"ERROR: empty command\n"
 
         parts = command_line.split(maxsplit=1)
         cmd = parts[0].lower()
@@ -84,17 +110,23 @@ class ScrcpyHelperServer:
 
         handler = self.commands.get(cmd)
         if handler is None:
-            return f"ERROR: unknown command '{cmd}'\n".encode()
+            return False, f"ERROR: unknown command '{cmd}'\n".encode()
 
         try:
             result = handler(args)
-            # Ensure response ends with newline
+
+            # Check for binary response
+            if isinstance(result, tuple) and len(result) == 2 and result[0] == "BINARY":
+                return True, result[1]
+
+            # Text response
             if not result.endswith("\n"):
                 result += "\n"
-            return result.encode()
+            return False, result.encode()
+
         except Exception as e:
             self._log(f"Error handling '{cmd}': {e}")
-            return f"ERROR: {e}\n".encode()
+            return False, f"ERROR: {e}\n".encode()
 
     def handle_client(self, client_socket: socket.socket, addr: Any) -> None:
         """Handle a single client connection."""
@@ -111,8 +143,16 @@ class ScrcpyHelperServer:
 
             if data:
                 command = data.decode("utf-8", errors="replace")
-                response = self.handle_command(command)
-                client_socket.sendall(response)
+                is_binary, response = self.handle_command(command)
+
+                if is_binary:
+                    # Send length-prefixed binary data
+                    length = struct.pack(">I", len(response))
+                    client_socket.sendall(length + response)
+                else:
+                    # Send text response
+                    client_socket.sendall(response)
+
         except Exception as e:
             self._log(f"Client error: {e}")
         finally:
@@ -185,11 +225,6 @@ class ScrcpyHelperServer:
 
         self._log("Server stopped")
 
-    def register_command(self, name: str, handler: Callable[[list[str]], str]) -> None:
+    def register_command(self, name: str, handler: Callable[[list[str]], ResponseType]) -> None:
         """Register a new command handler."""
         self.commands[name.lower()] = handler
-
-    def send_binary_response(self, client_socket: socket.socket, data: bytes) -> None:
-        """Send binary response with length prefix."""
-        length = struct.pack(">I", len(data))
-        client_socket.sendall(length + data)
