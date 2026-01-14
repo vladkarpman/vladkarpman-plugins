@@ -98,6 +98,10 @@ The final YAML file must have actual values, not placeholder tokens.
 # Compose Designer Configuration
 # Edit this file to customize code generation for your project
 
+# Agent model configuration
+model:
+  default: "opus"                        # Default model for all agents: "opus", "sonnet", or "haiku"
+
 # Project conventions
 naming:
   component_suffix: "Component"        # Suffix for UI components

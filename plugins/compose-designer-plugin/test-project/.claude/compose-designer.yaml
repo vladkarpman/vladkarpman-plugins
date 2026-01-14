@@ -1,6 +1,10 @@
 # Compose Designer Plugin Configuration
 # Generated for test project
 
+# Agent model configuration
+model:
+  default: "opus"  # "opus", "sonnet", or "haiku"
+
 # Project conventions
 naming:
   component_suffix: "Component"
@@ -41,8 +45,8 @@ testing:
 # Figma integration
 figma:
   extract_tokens: true
-  api_token_source: "env"
-  # Set FIGMA_TOKEN environment variable to use Figma API
+  api_token_source: "config"
+  api_token: "REDACTED_FIGMA_TOKEN"
   fallback_to_image: true
 
 # Output preferences
