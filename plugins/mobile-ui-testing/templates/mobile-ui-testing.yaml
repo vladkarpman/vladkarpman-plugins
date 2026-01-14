@@ -1,0 +1,20 @@
+# Mobile UI Testing Plugin Configuration
+# Copy to .claude/mobile-ui-testing.yaml in your project
+
+# Model for AI-powered operations (opus, sonnet, haiku)
+# Default: opus
+model: opus
+
+# Screenshot buffer capture interval in milliseconds
+# Lower = more screenshots, higher disk usage
+# Default: 150
+buffer_interval_ms: 150
+
+# Maximum screenshots in rolling buffer
+# Default: 200 (~30 seconds at 150ms)
+buffer_max_screenshots: 200
+
+# Verification recency threshold in milliseconds
+# Screenshots must be within this time OR be most recent
+# Default: 500
+verification_recency_ms: 500
