@@ -7,6 +7,15 @@ allowed-tools:
   - Write
   - Bash
   - Glob
+  # device-manager-mcp (fast path via scrcpy)
+  - mcp__device-manager__device_list
+  - mcp__device-manager__device_screen_size
+  - mcp__device-manager__device_screenshot
+  - mcp__device-manager__device_tap
+  - mcp__device-manager__device_swipe
+  - mcp__device-manager__device_type
+  - mcp__device-manager__device_press_key
+  # mobile-mcp (fallback and additional features)
   - mcp__mobile-mcp__mobile_list_available_devices
   - mcp__mobile-mcp__mobile_list_apps
   - mcp__mobile-mcp__mobile_launch_app
@@ -61,7 +70,7 @@ Extract from YAML:
 
 ### Step 4: Get Device
 
-**Tool:** `mcp__mobile-mcp__mobile_list_available_devices`
+**Tool:** `mcp__device-manager__device_list` (preferred) or `mcp__mobile-mcp__mobile_list_available_devices` (fallback)
 
 **If 0 devices:** Stop and show:
 ```
@@ -74,7 +83,7 @@ No device found. Connect a device and try again.
 
 ### Step 5: Get Screen Size (for percentage coordinates)
 
-**Tool:** `mcp__mobile-mcp__mobile_get_screen_size` with device={DEVICE_ID}
+**Tool:** `mcp__device-manager__device_screen_size` (preferred) or `mcp__mobile-mcp__mobile_get_screen_size` (fallback)
 
 Store: `{SCREEN_WIDTH}`, `{SCREEN_HEIGHT}`
 
@@ -301,13 +310,15 @@ rm -rf {BUFFER_DIR}
 
 ## Action Mapping
 
+**Tool Priority:** Use device-manager tools (fast) when available, fall back to mobile-mcp.
+
 ### Tap Actions
 
 | YAML | Tool | Parameters |
 |------|------|------------|
-| `tap: "Button"` | Find element, then `mobile_click_on_screen_at_coordinates` | x, y of element |
-| `tap: [100, 200]` | `mobile_click_on_screen_at_coordinates` | x=100, y=200 |
-| `tap: ["50%", "80%"]` | Calculate then `mobile_click_on_screen_at_coordinates` | x=width*0.5, y=height*0.8 |
+| `tap: "Button"` | Find element via `mobile_list_elements_on_screen`, then `device_tap` | x, y of element |
+| `tap: [100, 200]` | `mcp__device-manager__device_tap` | x=100, y=200 |
+| `tap: ["50%", "80%"]` | Calculate then `mcp__device-manager__device_tap` | x=width*0.5, y=height*0.8 |
 
 ### Finding Elements
 
@@ -325,16 +336,16 @@ When action uses element text (e.g., `tap: "Login"`):
 |------|------|
 | `double_tap: "X"` | Find element → `mobile_double_tap_on_screen` |
 | `long_press: "X"` | Find element → `mobile_long_press_on_screen_at_coordinates` |
-| `type: "text"` | `mobile_type_keys` with text, submit=false |
-| `type: {text: "X", submit: true}` | `mobile_type_keys` with submit=true |
-| `swipe: up` | `mobile_swipe_on_screen` direction="up" |
-| `swipe: {direction: up, distance: 500}` | `mobile_swipe_on_screen` with distance |
-| `press: back` | `mobile_press_button` button="BACK" |
-| `press: home` | `mobile_press_button` button="HOME" |
+| `type: "text"` | `mcp__device-manager__device_type` with text |
+| `type: {text: "X", submit: true}` | `device_type` then `device_press_key` ENTER |
+| `swipe: up` | `mcp__device-manager__device_swipe` direction="up" |
+| `swipe: {direction: up, distance: 500}` | `device_swipe` with distance |
+| `press: back` | `mcp__device-manager__device_press_key` key="BACK" |
+| `press: home` | `device_press_key` key="HOME" |
 | `wait: 2s` | Pause for 2 seconds |
 | `launch_app` | `mobile_launch_app` with config.app |
 | `terminate_app` | `mobile_terminate_app` with config.app |
-| `screenshot: "name"` | `mobile_take_screenshot` |
+| `screenshot: "name"` | `mcp__device-manager__device_screenshot` |
 | `set_orientation: landscape` | `mobile_set_orientation` |
 | `open_url: "https://..."` | `mobile_open_url` |
 
@@ -358,8 +369,8 @@ When action uses element text (e.g., `tap: "Login"`):
 
 2. Parse JSON output. Get `recommended` screenshot path.
 
-3. **If no candidates (buffer unavailable):** Fall back to mobile-mcp:
-   - **Tool:** `mcp__mobile-mcp__mobile_take_screenshot`
+3. **If no candidates (buffer unavailable):** Fall back to device-manager:
+   - **Tool:** `mcp__device-manager__device_screenshot`
    - Use that screenshot for analysis
 
 4. **Tool:** `Read` the recommended screenshot image
@@ -401,7 +412,7 @@ Conditionals check current state and execute branches accordingly.
    - Check condition against elements
 
    **For `if_screen`:**
-   - **Tool:** `mcp__mobile-mcp__mobile_take_screenshot` (device={DEVICE_ID})
+   - **Tool:** `mcp__device-manager__device_screenshot`
    - Analyze screenshot with AI vision (same logic as `verify_screen`)
    - Check if screen matches description
 

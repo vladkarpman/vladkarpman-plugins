@@ -1,12 +1,10 @@
 {
-  "mcpServers": {
-    "mobile-mcp": {
-      "command": "npx",
-      "args": ["-y", "@mobilenext/mobile-mcp@latest"]
-    },
-    "device-manager": {
-      "command": "uvx",
-      "args": ["--with", "mysc", "--with", "adbutils", "device-manager-mcp"]
-    }
+  "mobile-mcp": {
+    "command": "npx",
+    "args": ["-y", "@mobilenext/mobile-mcp@latest"]
+  },
+  "device-manager": {
+    "command": "uvx",
+    "args": ["device-manager-mcp"]
   }
 }
