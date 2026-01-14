@@ -107,50 +107,123 @@ trap cleanup EXIT
 
 ### Phase 1: Device Selection
 
-**Extract device_id from config:**
+**Inputs you'll receive for device selection:**
+- `device_override`: Device ID from CLI `--device` flag (or "none")
+- `config.testing.device_id`: From YAML config ("auto" or specific ID)
+
+**Selection priority chain:**
 
 ```
-device_id_config = config.testing.device_id  # e.g., "auto", "emulator-5554", "abc123def"
+1. CLI --device flag (highest priority)
+       ↓ (not provided or "none")
+2. Config device_id (if not "auto")
+       ↓ (is "auto")
+3. Single device → use automatically
+       ↓ (multiple devices)
+4. Interactive picker
 ```
 
-**If device_id is "auto":**
+**Step 1: List available devices**
 
-Parse available devices and select first:
+Use mobile-mcp tool:
 
 ```bash
-# Get first device ID
-selected_device=$(echo "$devices" | head -1 | sed -n 's/.*id: \([^ ]*\).*/\1/p')
-echo "✓ Auto-selected device: $selected_device"
+# Get available devices
+devices=$(mcp__mobile-mcp__mobile_list_available_devices)
+device_count=$(echo "$devices" | grep -c "id:")
+
+if [ "$device_count" -eq 0 ]; then
+  echo "❌ No Android devices found"
+  echo ""
+  echo "Connect a device:"
+  echo "  • Physical: Enable USB debugging in Developer Options"
+  echo "  • Emulator: Launch from Android Studio → Tools → AVD Manager"
+  echo ""
+  echo "Verify: adb devices"
+  exit 1
+fi
+
+echo "Found $device_count device(s)"
 ```
 
-**If device_id is specific ID:**
+**Step 2: Apply selection priority**
 
-Verify it exists in available devices:
+**Priority 1 - CLI override:**
+
+If `device_override` is provided and not "none":
 
 ```bash
-echo "$devices" | grep -q "$device_id_config" || {
+# Verify CLI-specified device exists
+if ! echo "$devices" | grep -q "$device_override"; then
+  echo "❌ Device not found: $device_override"
+  echo ""
+  echo "Available devices:"
+  echo "$devices" | grep "id:" | sed 's/^/  • /'
+  echo ""
+  echo "Fix: Use one of the above IDs"
+  exit 1
+fi
+
+selected_device="$device_override"
+echo "✓ Using CLI-specified device: $selected_device"
+```
+
+**Priority 2 - Config device_id:**
+
+Else if `config.testing.device_id` is not "auto":
+
+```bash
+device_id_config="{config.testing.device_id}"
+
+# Verify config-specified device exists
+if ! echo "$devices" | grep -q "$device_id_config"; then
   echo "❌ Device not found: $device_id_config"
   echo ""
   echo "Available devices:"
-  echo "$devices"
+  echo "$devices" | grep "id:" | sed 's/^/  • /'
+  echo ""
+  echo "Fix: Update testing.device_id in .claude/compose-designer.yaml"
+  echo "     Or set to 'auto' for automatic selection"
   exit 1
-}
+fi
 
 selected_device="$device_id_config"
-echo "✓ Using configured device: $selected_device"
+echo "✓ Using config-specified device: $selected_device"
 ```
 
-**If multiple devices and config is "auto", ask user:**
+**Priority 3 - Auto-select single device:**
+
+Else if only one device available:
+
+```bash
+selected_device=$(echo "$devices" | grep "id:" | head -1 | sed 's/.*id: \([^ ]*\).*/\1/')
+echo "✓ Auto-selected device: $selected_device"
+```
+
+**Priority 4 - Interactive picker:**
+
+Else (multiple devices, no specific selection):
+
+Use AskUserQuestion tool to let user choose:
 
 ```
-Multiple devices found:
-1. Pixel 4 Emulator (emulator-5554)
-2. Galaxy S21 (abc123def456)
+Multiple devices found. Which one to use for testing?
 
-Which device should I use? [1/2]:
+Options built from device list:
+- Each device as an option with id and name
+- Example: "Pixel 4 API 33 (emulator-5554)"
 ```
 
-Store selected device ID for subsequent steps.
+After user selects:
+
+```bash
+selected_device="{user_selected_device_id}"
+echo "✓ User selected device: $selected_device"
+```
+
+**Step 3: Store selected device**
+
+The `selected_device` variable is now set and will be used in subsequent phases.
 
 ### Phase 2: Generate Test Harness
 
