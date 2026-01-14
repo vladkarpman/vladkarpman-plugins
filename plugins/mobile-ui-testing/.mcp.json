@@ -3,6 +3,11 @@
     "mobile-mcp": {
       "command": "npx",
       "args": ["-y", "@mobilenext/mobile-mcp@latest"]
+    },
+    "device-manager": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/scrcpy_helper/.venv/bin/python",
+      "args": ["-m", "device_manager"],
+      "cwd": "${CLAUDE_PLUGIN_ROOT}/server"
     }
   }
 }
