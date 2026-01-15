@@ -8,7 +8,6 @@ allowed-tools:
   - Glob
   - Task
   - AskUserQuestion
-  - mcp__screen-buffer__device_stop_recording
 ---
 
 # Stop Recording - Generate YAML Test
@@ -51,14 +50,19 @@ This ensures subsequent steps can use `{TEST_FOLDER}` consistently regardless of
 
 ### Step 2: Stop Video Recording
 
-**Tool:** `mcp__screen-buffer__device_stop_recording`
-```json
-{}
+**Tool:** `Bash`
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/stop-recording.sh" {DEVICE_ID} {TEST_FOLDER}/recording/recording.mp4
 ```
 
-This stops the recording and finalizes the video file.
-The response includes duration and file size.
-Video is saved directly to: `{TEST_FOLDER}/recording/recording.mp4`
+This stops screenrecord on device and pulls the video file.
+
+**Response is JSON:**
+```json
+{"success": true, "output_path": "...", "file_size_bytes": 12345}
+```
+
+**If success is false:** Show error but continue (touch events still available).
 
 ### Step 3: Stop Touch Monitor
 

@@ -51,6 +51,7 @@ Write JSON to `output_file`:
 ```json
 {
   "step_001": {
+    "element_text": "5",
     "analysis": {
       "before": "Calculator app with empty display",
       "action": "Tapped '5' button on number pad",
@@ -59,6 +60,7 @@ Write JSON to `output_file`:
     "suggestedVerification": "Display shows the number 5"
   },
   "step_002": {
+    "element_text": "+",
     "analysis": {
       "before": "Display shows '5'",
       "action": "Tapped '+' operator button",
@@ -68,6 +70,12 @@ Write JSON to `output_file`:
   }
 }
 ```
+
+**element_text**: Short label for the tapped element (button text, menu item, etc.)
+- For buttons: use the button label ("5", "+", "Submit", "OK")
+- For text fields: use "Text field" or field label
+- For icons: describe briefly ("Menu icon", "Back arrow")
+- Keep it short (1-3 words max)
 
 ## Execution
 

@@ -9,7 +9,6 @@ allowed-tools:
   - Bash
   - AskUserQuestion
   - mcp__mobile-mcp__mobile_list_available_devices
-  - mcp__screen-buffer__device_start_recording
 ---
 
 # Record Test - Start Recording User Actions
@@ -91,16 +90,23 @@ mkdir -p tests/{TEST_NAME}/recording/screenshots tests/{TEST_NAME}/baselines tes
 mkdir -p .claude
 ```
 
-### Step 6: Get Video Start Timestamp
+### Step 6: Start Video Recording
 
 **Tool:** `Bash`
 ```bash
-python3 -c "import time; print(time.time())"
+"${CLAUDE_PLUGIN_ROOT}/scripts/start-recording.sh" {DEVICE_ID} tests/{TEST_NAME}/recording/recording.mp4
 ```
 
-Store the output number as `{VIDEO_START_TIME}` (e.g., `1768233811.7967029`).
+**Response is JSON:**
+```json
+{"success": true, "recording_start_time": 1234567890.123, "pid": 12345}
+```
 
-### Step 7: Create Initial Recording State
+**If success is false:** Stop and show the error message.
+
+**If success is true:** Store `recording_start_time` as `{VIDEO_START_TIME}`.
+
+### Step 7: Create Recording State
 
 **Tool:** `Bash` (use Bash because file doesn't exist yet)
 ```bash
@@ -118,20 +124,9 @@ cat > .claude/recording-state.json << 'EOF'
 EOF
 ```
 
-Replace placeholders with actual values.
+Replace placeholders with actual values. `{VIDEO_START_TIME}` comes from start-recording.sh output.
 
-### Step 8: Start Video Recording
-
-**Tool:** `mcp__screen-buffer__device_start_recording`
-```json
-{
-  "output_path": "tests/{TEST_NAME}/recording/recording.mp4"
-}
-```
-
-Store the response confirmation. Recording is now active.
-
-### Step 9: Start Touch Monitor
+### Step 8: Start Touch Monitor
 
 **Tool:** `Bash` with `run_in_background: true`
 ```bash
@@ -142,14 +137,14 @@ echo "TOUCH_PID=$!"
 **Read the background task output file** to get `TOUCH_PID=XXXXX`.
 Store the number as `{TOUCH_PID}`.
 
-### Step 10: Update Recording State with PID
+### Step 9: Update Recording State with PID
 
 **Tool:** `Read` then `Write` on `.claude/recording-state.json`
 
 Update the file to set:
 - `"touchPid": {TOUCH_PID}`
 
-### Step 11: Output Success Message
+### Step 10: Output Success Message
 
 Output this message to the user (replace placeholders):
 
@@ -173,7 +168,7 @@ When done, say "stop" or use /stop-recording
 ══════════════════════════════════════════════════════════
 ```
 
-### Step 12: Wait for Stop Command
+### Step 11: Wait for Stop Command
 
 When user says "stop", "done", or uses `/stop-recording`:
 - Invoke the `stop-recording` skill/command

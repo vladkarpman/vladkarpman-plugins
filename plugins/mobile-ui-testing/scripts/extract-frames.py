@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
 Extract frames from video at specific timestamps using ffmpeg.
-Extracts multiple frames per touch: before, exact, and after.
+
+Smart extraction: calculates safe boundaries between steps to prevent overlap.
+Extracts 3 frames per step: before, action, after.
 Uses parallel processing for speed.
 """
 
@@ -13,19 +15,18 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Frame extraction offsets in milliseconds
-FRAME_OFFSETS = {
-    "before_1": -300,  # 300ms before tap
-    "before_2": -200,  # 200ms before tap
-    "before_3": -100,  # 100ms before tap
-    "exact": 0,        # At tap moment
-    "after_1": 100,    # 100ms after tap
-    "after_2": 200,    # 200ms after tap
-    "after_3": 300,    # 300ms after tap
-}
-
 # Number of parallel ffmpeg processes
-MAX_WORKERS = min(32, (os.cpu_count() or 4) * 4)
+MAX_WORKERS = min(24, (os.cpu_count() or 4) * 4)
+
+# Default timing preferences (in seconds)
+# UI responds instantly to touch, so we capture BEFORE touch occurs:
+# Before: Stable state well before tap decision
+# Action: Moment just before finger contact (shows target button)
+# After: Result after UI has settled
+BEFORE_OFFSET = 0.5   # 500ms before touch - stable pre-tap state
+ACTION_OFFSET = 0.3   # 300ms before touch - target visible, about to tap
+AFTER_OFFSET = 0.5    # 500ms after touch end - settled result
+SAFE_MARGIN = 0.05    # 50ms margin from adjacent steps
 
 
 def extract_frame(video_path: str, timestamp_sec: float, output_path: str) -> Tuple[str, bool]:
@@ -51,32 +52,86 @@ def extract_frame(video_path: str, timestamp_sec: float, output_path: str) -> Tu
     return output_path, result.returncode == 0
 
 
-def build_extraction_tasks(
-    video_path: str,
+def calculate_smart_frame_times(
     touch_events: List[Dict[str, Any]],
     video_start_time: float,
+    video_duration: float
+) -> List[Dict[str, Any]]:
+    """
+    Calculate frame extraction times with smart boundaries.
+
+    Key insight: touch timestamp is when finger LIFTS (touch end).
+    The actual tap started duration_ms earlier.
+
+    Frame timing:
+    - before: stable state before finger contact (BEFORE_OFFSET before touch start)
+    - action: moment of finger contact (touch start = timestamp - duration_ms)
+    - after: result after UI settles (AFTER_OFFSET after touch end)
+
+    Safe boundaries prevent overlap with adjacent steps.
+    """
+    frame_times = []
+    video_end_time = video_start_time + video_duration
+
+    for i, event in enumerate(touch_events):
+        if "index" not in event or "timestamp" not in event:
+            continue
+
+        touch_end_time = event["timestamp"]
+        duration_ms = event.get("duration_ms", 50)  # Default 50ms if not present
+        touch_start_time = touch_end_time - (duration_ms / 1000.0)
+        step_num = event["index"]
+
+        # Calculate safe boundaries
+        if i > 0:
+            prev_time = touch_events[i - 1]["timestamp"]
+            before_safe = prev_time + SAFE_MARGIN
+        else:
+            before_safe = video_start_time
+
+        if i < len(touch_events) - 1:
+            next_time = touch_events[i + 1]["timestamp"]
+            after_safe = next_time - SAFE_MARGIN
+        else:
+            after_safe = video_end_time
+
+        # Calculate frame times based on touch start/end
+        # Before: stable state well before tap
+        before_time = max(touch_start_time - BEFORE_OFFSET, before_safe)
+        # Action: moment just BEFORE finger contact - shows target button
+        action_time = max(touch_start_time - ACTION_OFFSET, before_safe)
+        # After: result after UI has responded and settled
+        after_time = min(touch_end_time + AFTER_OFFSET, after_safe)
+
+        # Convert to video-relative times
+        frame_times.append({
+            "step_num": step_num,
+            "before": before_time - video_start_time,
+            "action": action_time - video_start_time,
+            "after": after_time - video_start_time,
+        })
+
+    return frame_times
+
+
+def build_extraction_tasks(
+    video_path: str,
+    frame_times: List[Dict[str, Any]],
     output_dir: Path
 ) -> List[Tuple[str, float, str, int, str]]:
     """
-    Build list of extraction tasks.
+    Build list of extraction tasks from calculated frame times.
 
     Returns list of (video_path, timestamp, output_path, step_num, frame_type).
     """
     tasks = []
 
-    for event in touch_events:
-        if "index" not in event or "timestamp" not in event:
-            continue
-
-        touch_time = event["timestamp"]
-        step_num = event["index"]
+    for ft in frame_times:
+        step_num = ft["step_num"]
         step_str = f"{step_num:03d}"
 
-        # Calculate base position in video
-        video_position = touch_time - video_start_time
-
-        for frame_type, offset_ms in FRAME_OFFSETS.items():
-            frame_position = video_position + (offset_ms / 1000)
+        for frame_type in ["before", "action", "after"]:
+            frame_position = ft[frame_type]
             frame_filename = f"step_{step_str}_{frame_type}.png"
             frame_path = str(output_dir / frame_filename)
 
@@ -89,6 +144,7 @@ def extract_frames_parallel(
     video_path: str,
     touch_events: List[Dict[str, Any]],
     video_start_time: float,
+    video_duration: float,
     output_dir: str
 ) -> List[Dict[str, Any]]:
     """
@@ -99,8 +155,11 @@ def extract_frames_parallel(
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
+    # Calculate smart frame times
+    frame_times = calculate_smart_frame_times(touch_events, video_start_time, video_duration)
+
     # Build all extraction tasks
-    tasks = build_extraction_tasks(video_path, touch_events, video_start_time, output_path)
+    tasks = build_extraction_tasks(video_path, frame_times, output_path)
 
     print(f"Extracting {len(tasks)} frames using {MAX_WORKERS} parallel workers...", file=sys.stderr)
 
@@ -145,8 +204,8 @@ def extract_frames_parallel(
         frames = results.get(step_num, {})
 
         event["frames"] = frames
-        # Backward compatibility - set screenshot to before_3
-        event["screenshot"] = frames.get("before_3")
+        # Backward compatibility - set screenshot to before
+        event["screenshot"] = frames.get("before")
 
         updated_events.append(event)
 
@@ -198,10 +257,16 @@ if __name__ == "__main__":
         print(f"Error: video_start_time must be a number, got: {sys.argv[3]}", file=sys.stderr)
         sys.exit(1)
 
-    # Load and validate events file
+    # Load and validate events file (supports JSON array or JSON Lines format)
     try:
         with open(events_path) as f:
-            events = json.load(f)
+            content = f.read().strip()
+            if content.startswith('['):
+                # JSON array format
+                events = json.loads(content)
+            else:
+                # JSON Lines format (one object per line)
+                events = [json.loads(line) for line in content.split('\n') if line.strip()]
     except FileNotFoundError:
         print(f"Error reading events file: File not found: {events_path}", file=sys.stderr)
         sys.exit(1)
@@ -209,18 +274,21 @@ if __name__ == "__main__":
         print(f"Error reading events file: Invalid JSON: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Get video duration for info
+    # Get video duration (required for smart boundaries)
     duration = get_video_duration(video_path)
-    if duration:
-        print(f"Video duration: {duration:.1f}s", file=sys.stderr)
+    if not duration:
+        print("Error: Could not determine video duration", file=sys.stderr)
+        sys.exit(1)
 
-    frame_count = len(events) * len(FRAME_OFFSETS)
-    print(f"Processing {len(events)} touches × {len(FRAME_OFFSETS)} frames = {frame_count} frames", file=sys.stderr)
+    print(f"Video duration: {duration:.1f}s", file=sys.stderr)
+
+    frame_count = len(events) * 3  # 3 frames per step
+    print(f"Processing {len(events)} touches × 3 frames = {frame_count} frames", file=sys.stderr)
 
     import time
     start_time = time.time()
 
-    updated = extract_frames_parallel(video_path, events, video_start, output_dir)
+    updated = extract_frames_parallel(video_path, events, video_start, duration, output_dir)
 
     elapsed = time.time() - start_time
     print(f"Extraction complete in {elapsed:.1f}s ({frame_count/elapsed:.1f} frames/sec)", file=sys.stderr)

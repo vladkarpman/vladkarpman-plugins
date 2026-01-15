@@ -5,8 +5,8 @@
       "args": ["-y", "@mobilenext/mobile-mcp@latest"]
     },
     "screen-buffer": {
-      "command": "uvx",
-      "args": ["screen-buffer-mcp"]
+      "command": "uv",
+      "args": ["run", "--directory", "/Users/vladislavkarpman/Projects/screen-buffer-mcp", "screen-buffer-mcp"]
     }
   }
 }

@@ -71,13 +71,17 @@ def load_analysis(recording_folder: Path) -> Dict[str, Any]:
         return json.load(f)
 
 
-def find_screenshots(recording_folder: Path) -> Dict[str, Dict[str, List[str]]]:
-    """Find screenshot files organized by step."""
+def find_screenshots(recording_folder: Path) -> Dict[str, Dict[str, str]]:
+    """Find screenshot files organized by step.
+
+    Returns dict mapping step number to frame paths:
+    {'001': {'before': 'path', 'action': 'path', 'after': 'path'}}
+    """
     screenshots_dir = recording_folder / "screenshots"
     if not screenshots_dir.exists():
         return {}
 
-    screenshots: Dict[str, Dict[str, Any]] = {}
+    screenshots: Dict[str, Dict[str, str]] = {}
     for f in sorted(screenshots_dir.iterdir()):
         if f.suffix.lower() not in ['.png', '.jpg', '.jpeg']:
             continue
@@ -85,35 +89,42 @@ def find_screenshots(recording_folder: Path) -> Dict[str, Dict[str, List[str]]]:
         rel_path = f"recording/screenshots/{f.name}"
 
         # Parse filename patterns:
-        # - step_001_before_1.png, step_001_exact.png, step_001_after_1.png (new multi-frame)
+        # - step_001_before.png, step_001_action.png, step_001_after.png (current 3-frame)
+        # - step_001_before_1.png, step_001_after_3.png (legacy multi-frame)
         # - touch_001.png (legacy single frame)
 
-        # New format: step_NNN_type.png or step_NNN_type_N.png
-        match = re.match(r'step_(\d+)_(before|after|exact)(?:_(\d+))?\.png', f.name)
+        # Current format: step_NNN_type.png (no number suffix)
+        match = re.match(r'step_(\d+)_(before|after|action)\.png', f.name)
         if match:
             step_num = match.group(1)
             frame_type = match.group(2)
 
             if step_num not in screenshots:
-                screenshots[step_num] = {'before': [], 'after': [], 'exact': None}
+                screenshots[step_num] = {'before': '', 'action': '', 'after': ''}
 
-            if frame_type == 'exact':
-                screenshots[step_num]['exact'] = rel_path
-            else:
-                screenshots[step_num][frame_type].append(rel_path)
+            screenshots[step_num][frame_type] = rel_path
         else:
-            # Legacy format: touch_XXX.png
-            touch_match = re.match(r'touch_(\d+)\.png', f.name)
-            if touch_match:
-                step_num = touch_match.group(1)
-                if step_num not in screenshots:
-                    screenshots[step_num] = {'before': [], 'after': [], 'exact': None}
-                screenshots[step_num]['before'].append(rel_path)
+            # Legacy multi-frame format: step_NNN_type_N.png
+            multi_match = re.match(r'step_(\d+)_(before|after|action)_(\d+)\.png', f.name)
+            if multi_match:
+                step_num = multi_match.group(1)
+                frame_type = multi_match.group(2)
+                frame_idx = int(multi_match.group(3))
 
-    # Sort before/after lists to ensure correct order (before_1, before_2, before_3)
-    for step_num in screenshots:
-        screenshots[step_num]['before'].sort()
-        screenshots[step_num]['after'].sort()
+                if step_num not in screenshots:
+                    screenshots[step_num] = {'before': '', 'action': '', 'after': ''}
+
+                # Use the first frame of each type for legacy format
+                if frame_type == 'action' or not screenshots[step_num].get(frame_type):
+                    screenshots[step_num][frame_type] = rel_path
+            else:
+                # Legacy single frame format: touch_XXX.png
+                touch_match = re.match(r'touch_(\d+)\.png', f.name)
+                if touch_match:
+                    step_num = touch_match.group(1)
+                    if step_num not in screenshots:
+                        screenshots[step_num] = {'before': '', 'action': '', 'after': ''}
+                    screenshots[step_num]['before'] = rel_path
 
     return screenshots
 
@@ -144,7 +155,7 @@ def get_video_duration(recording_folder: Path) -> str:
     return "0:30"
 
 
-def build_steps(touch_events: List[Dict[str, Any]], screenshots: Dict[str, Dict[str, List[str]]], analysis: Dict[str, Any], video_start_time: float = 0) -> List[Dict[str, Any]]:
+def build_steps(touch_events: List[Dict[str, Any]], screenshots: Dict[str, Dict[str, str]], analysis: Dict[str, Any], video_start_time: float = 0) -> List[Dict[str, Any]]:
     """Build step objects from touch events.
 
     Args:
@@ -171,6 +182,10 @@ def build_steps(touch_events: List[Dict[str, Any]], screenshots: Dict[str, Dict[
         abs_timestamp = event.get("timestamp", 0)
         rel_timestamp = abs_timestamp - video_start_time if abs_timestamp > 0 else 0
 
+        # Get element_text from event or analysis
+        step_analysis = analysis.get(step_id, {})
+        element_text = event.get("element_text", "") or step_analysis.get("element_text", "")
+
         step: Dict[str, Any] = {
             "id": step_id,
             "timestamp": rel_timestamp,  # Now relative to video start
@@ -178,7 +193,7 @@ def build_steps(touch_events: List[Dict[str, Any]], screenshots: Dict[str, Dict[
             "target": {
                 "x": event.get("x"),
                 "y": event.get("y"),
-                "text": event.get("element_text", "")
+                "text": element_text
             },
             "waitAfter": 0
         }
@@ -188,7 +203,6 @@ def build_steps(touch_events: List[Dict[str, Any]], screenshots: Dict[str, Dict[
             step["frames"] = screenshots[step_num]
 
         # Add analysis if available
-        step_analysis = analysis.get(step_id, {})
         if step_analysis:
             step["analysis"] = step_analysis.get("analysis", {})
             step["suggestedVerification"] = step_analysis.get("suggestedVerification", "")
