@@ -62,6 +62,16 @@ Extract from YAML:
 - `{SETUP_STEPS}` = setup array
 - `{TEARDOWN_STEPS}` = teardown array
 - `{TESTS}` = tests array
+- `{PRECONDITION}` = config.precondition (single precondition name, optional)
+- `{PRECONDITIONS}` = config.preconditions (array of precondition names, optional)
+
+**Build precondition list:**
+- If `{PRECONDITION}` set: `{PRECONDITION_LIST}` = [`{PRECONDITION}`]
+- If `{PRECONDITIONS}` set: `{PRECONDITION_LIST}` = `{PRECONDITIONS}`
+- Otherwise: `{PRECONDITION_LIST}` = [] (empty)
+
+Initialize precondition verify storage:
+- `{PRECONDITION_VERIFIES}` = {} (empty map)
 
 ### Step 4: Get Device
 
@@ -121,6 +131,65 @@ Initialize report data:
   tests: []
 }
 ```
+
+### Step 5.7: Execute Preconditions
+
+**If `{PRECONDITION_LIST}` is not empty:**
+
+For each `{PRECONDITION_NAME}` in `{PRECONDITION_LIST}`:
+
+1. **Load precondition file:**
+   **Tool:** `Read` file `tests/preconditions/{PRECONDITION_NAME}.yaml`
+
+   **If not found:**
+   - **Tool:** `Glob` pattern `tests/preconditions/*.yaml` to list available preconditions
+   - FAIL with:
+   ```
+   ✗ Precondition not found: {PRECONDITION_NAME}
+
+   Available preconditions:
+   {list of .yaml files in tests/preconditions/}
+   ```
+
+2. **Parse precondition:**
+   - Extract `steps` array from precondition YAML
+   - Extract `verify` section (for later if_precondition checks)
+   - Store verify config: `{PRECONDITION_VERIFIES}[{PRECONDITION_NAME}] = verify`
+
+3. **Execute precondition steps:**
+   Output:
+   ```
+   Precondition: {PRECONDITION_NAME}
+   ────────────────────────────────────────
+   ```
+
+   For each step in precondition.steps:
+   - Execute action (same logic as test steps in Action Mapping)
+   - Output: `  [precondition] {action} ✓`
+   - On failure: FAIL test with precondition error:
+     ```
+     ✗ Precondition failed: {PRECONDITION_NAME}
+       Step: {action}
+       Error: {error details}
+     ```
+
+4. **Verify precondition state:**
+   Using the `verify` section from precondition file:
+   - If `verify.element`: **Tool:** `mcp__mobile-mcp__mobile_list_elements_on_screen`, check element exists
+   - If `verify.screen`: Take screenshot via `mcp__screen-buffer__device_screenshot`, AI vision check
+
+   **If verification fails:**
+   ```
+   ✗ Precondition verification failed: {PRECONDITION_NAME}
+   Expected: {verify.element or verify.screen}
+   ```
+
+   **If verification passes:**
+   ```
+   ✓ Precondition active: {PRECONDITION_NAME}
+   ```
+
+**Continue to Step 6 (Execute Setup).**
 
 ### Step 6: Execute Setup
 
@@ -411,6 +480,17 @@ Conditionals check current state and execute branches accordingly.
    - Analyze screenshot with AI vision (same logic as `verify_screen`)
    - Check if screen matches description
 
+   **For `if_precondition`:**
+   - Look up verify config: `{PRECONDITION_VERIFIES}[condition_value]`
+   - If precondition not in `{PRECONDITION_VERIFIES}`:
+     - Precondition was not executed for this test
+     - Treat condition as false
+     - Log warning: `⚠ Precondition '{condition_value}' not loaded, treating as false`
+   - If verify config exists:
+     - If `verify.element`: **Tool:** `mcp__mobile-mcp__mobile_list_elements_on_screen`, check element exists
+     - If `verify.screen`: **Tool:** `mcp__screen-buffer__device_screenshot`, AI vision check
+   - Condition is true if verify check passes
+
 3. **Execute branch:**
    - If condition evaluates to true: Execute steps in `then` array
    - If condition evaluates to false: Execute steps in `else` array (if exists)
@@ -426,7 +506,7 @@ Conditionals check current state and execute branches accordingly.
 | `if_all_present: ["A","B"]` | ALL elements found (A AND B) | Any element missing |
 | `if_any_present: ["A","B"]` | At least ONE element found (A OR B) | No elements found |
 | `if_screen: "desc"` | AI analysis returns "matches description" | AI returns "doesn't match" |
-| `if_precondition: "name"` | Precondition verify check passes (see Step 6.5) | Verify check fails |
+| `if_precondition: "name"` | Precondition verify check passes (see Step 5.7) | Verify check fails or precondition not loaded |
 
 **Legacy operator mapping (for backward compatibility):**
 | Legacy | Maps To |
