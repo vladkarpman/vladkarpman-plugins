@@ -247,6 +247,26 @@ parameters = [
 ]
 ```
 
+**Step 1.5: Determine theme wrapper**
+
+Check config for custom theme:
+
+```bash
+# Read theme composable from config
+theme_composable="${config.theme.composable:-}"
+
+if [ -n "$theme_composable" ]; then
+  # Extract simple name from full path (e.g., "AppTheme" from "com.myapp.ui.theme.AppTheme")
+  theme_composable_name=$(echo "$theme_composable" | sed 's/.*\.//')
+  theme_import="import $theme_composable"
+  echo "Using project theme: $theme_composable_name"
+else
+  theme_composable_name="MaterialTheme"
+  theme_import=""
+  echo "Using default MaterialTheme"
+fi
+```
+
 **Step 2: Generate test activity**
 
 Create test activity file:
@@ -262,6 +282,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import {extracted_package}.{component_name}
+{if config.theme.composable:}
+import {config.theme.composable}
+{endif}
 
 /**
  * Test activity for compose-designer plugin.
@@ -273,7 +296,11 @@ class {config.testing.test_activity_name} : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
+            {if config.theme.composable:}
+            {theme_composable_name} {
+            {else:}
             MaterialTheme {
+            {endif}
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
