@@ -16,7 +16,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 
 def find_available_preconditions(base_path: Path) -> List[str]:
@@ -77,34 +77,43 @@ def find_screenshots(recording_folder: Path) -> Dict[str, Dict[str, List[str]]]:
     if not screenshots_dir.exists():
         return {}
 
-    screenshots: Dict[str, Dict[str, List[str]]] = {}
+    screenshots: Dict[str, Dict[str, Any]] = {}
     for f in sorted(screenshots_dir.iterdir()):
         if f.suffix.lower() not in ['.png', '.jpg', '.jpeg']:
             continue
 
+        rel_path = f"recording/screenshots/{f.name}"
+
         # Parse filename patterns:
-        # - step_001_before_1.png (multi-frame)
-        # - touch_001.png (single frame)
-        match = re.match(r'step_(\d+)_(before|after)_(\d+)', f.name)
+        # - step_001_before_1.png, step_001_exact.png, step_001_after_1.png (new multi-frame)
+        # - touch_001.png (legacy single frame)
+
+        # New format: step_NNN_type.png or step_NNN_type_N.png
+        match = re.match(r'step_(\d+)_(before|after|exact)(?:_(\d+))?\.png', f.name)
         if match:
             step_num = match.group(1)
             frame_type = match.group(2)
 
             if step_num not in screenshots:
-                screenshots[step_num] = {'before': [], 'after': []}
+                screenshots[step_num] = {'before': [], 'after': [], 'exact': None}
 
-            # Use relative path from approval.html location
-            rel_path = f"recording/screenshots/{f.name}"
-            screenshots[step_num][frame_type].append(rel_path)
+            if frame_type == 'exact':
+                screenshots[step_num]['exact'] = rel_path
+            else:
+                screenshots[step_num][frame_type].append(rel_path)
         else:
-            # Handle touch_XXX.png format
+            # Legacy format: touch_XXX.png
             touch_match = re.match(r'touch_(\d+)\.png', f.name)
             if touch_match:
                 step_num = touch_match.group(1)
                 if step_num not in screenshots:
-                    screenshots[step_num] = {'before': [], 'after': []}
-                rel_path = f"recording/screenshots/{f.name}"
+                    screenshots[step_num] = {'before': [], 'after': [], 'exact': None}
                 screenshots[step_num]['before'].append(rel_path)
+
+    # Sort before/after lists to ensure correct order (before_1, before_2, before_3)
+    for step_num in screenshots:
+        screenshots[step_num]['before'].sort()
+        screenshots[step_num]['after'].sort()
 
     return screenshots
 
