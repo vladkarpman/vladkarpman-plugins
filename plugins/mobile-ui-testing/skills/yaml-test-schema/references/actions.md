@@ -142,6 +142,28 @@ Types text into currently focused field.
 - list_apps  # Lists all installed apps (useful for debugging)
 ```
 
+## App State Management
+
+### Clear App Data
+```yaml
+# Clear configured app's data
+- clear_app_data
+
+# Clear specific app's data
+- clear_app_data: "com.example.app"
+```
+Clears all app data: cache, preferences, databases, and files. App is force-stopped if running. Equivalent to "Clear Data" in Android Settings.
+
+### Revoke Permissions
+```yaml
+# Revoke configured app's permissions
+- revoke_permissions
+
+# Revoke specific app's permissions
+- revoke_permissions: "com.example.app"
+```
+Revokes all runtime permissions (camera, location, storage, etc.). App will prompt for permissions again on next use.
+
 ## Orientation
 
 ### Set Orientation
@@ -205,6 +227,8 @@ Saves screenshot to specific file path.
 | `install_app` | `mobile_install_app` |
 | `uninstall_app` | `mobile_uninstall_app` |
 | `list_apps` | `mobile_list_apps` |
+| `clear_app_data` | Bash: `adb shell pm clear` |
+| `revoke_permissions` | Bash: `adb shell pm reset-permissions` |
 | `set_orientation` | `mobile_set_orientation` |
 | `get_orientation` | `mobile_get_orientation` |
 | `get_screen_size` | `mobile_get_screen_size` |
