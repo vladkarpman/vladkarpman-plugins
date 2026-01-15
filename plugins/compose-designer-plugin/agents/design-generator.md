@@ -168,6 +168,65 @@ Map visual colors to theme colors:
 
 If no theme files found, proceed with hardcoded colors but document this.
 
+### Step 2.5: Check Component Library
+
+If `config.component_library` exists and has entries:
+
+**Read component library:**
+
+```bash
+# Parse component_library from config
+# Build lookup map: category -> [components]
+```
+
+**During code generation:**
+
+When generating UI elements, check if a matching component exists:
+
+1. For buttons: Check `component_library.buttons`
+   - Match based on `use_when` hints
+   - Example: "submit button" matches component with use_when containing "submit"
+
+2. For cards: Check `component_library.cards`
+
+3. For inputs: Check `component_library.inputs`
+
+**If match found:**
+
+```kotlin
+// Instead of generating:
+Button(
+    onClick = onSubmit,
+    modifier = Modifier.fillMaxWidth()
+) {
+    Text("Submit")
+}
+
+// Generate:
+PrimaryButton(
+    text = "Submit",
+    onClick = onSubmit,
+    modifier = Modifier.fillMaxWidth()
+)
+```
+
+Add required import from component's `import` field.
+
+**If no match found:**
+
+Generate fresh code as usual.
+
+**Report component reuse:**
+
+Track which library components were used:
+
+```
+Component Library Usage:
+  ✓ PrimaryButton (buttons) - "Submit" button
+  ✓ ContentCard (cards) - main container
+  ○ SecondaryButton - not used
+```
+
 ### Step 3: Extract Mock Data from Design
 
 Analyze text content in the design to create realistic mock data:
@@ -388,6 +447,12 @@ Mock Data Sources:
 {if missing assets:}
 ⚠️  TODO: Provide images for: {list missing assets}
 
+{if component_library used:}
+Component Library Usage:
+  ✓ {ComponentName} ({category}) - "{usage context}"
+  ✓ {ComponentName} ({category}) - "{usage context}"
+  ○ {UnusedComponent} - not used
+
 Ready for Phase 2: Visual Validation
 ```
 
@@ -554,6 +619,12 @@ Mock Data Sources:
 {if missing assets:}
 ⚠️  TODO: Provide images for: {list missing assets}
 
+{if component_library used:}
+Component Library Usage:
+  ✓ {ComponentName} ({category}) - "{usage context}"
+  ✓ {ComponentName} ({category}) - "{usage context}"
+  ○ {UnusedComponent} - not used
+
 Ready for Phase 2: Visual Validation
 ```
 
@@ -577,7 +648,14 @@ Also provide a JSON block for programmatic access:
     "Missing icons: star, heart",
     "Using hardcoded colors (no theme found)"
   ],
-  "mock_data_extracted": boolean
+  "mock_data_extracted": boolean,
+  "component_library_usage": {
+    "used": [
+      {"name": "PrimaryButton", "category": "buttons", "context": "Submit button"},
+      {"name": "ContentCard", "category": "cards", "context": "main container"}
+    ],
+    "available_unused": ["SecondaryButton", "OutlinedTextField"]
+  }
 }
 ```
 
