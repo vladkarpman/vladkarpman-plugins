@@ -377,20 +377,44 @@
             font-size: 0.75rem;
         }
 
-        /* Conditional Section */
+        /* Conditional Section - Collapsed by default */
         .step-conditional {
             background: rgba(59, 130, 246, 0.1);
             border: 1px solid rgba(59, 130, 246, 0.3);
             border-radius: 6px;
-            padding: 12px;
             margin-bottom: 12px;
+            overflow: hidden;
+        }
+
+        .step-conditional.collapsed {
+            background: transparent;
+            border: 1px dashed rgba(59, 130, 246, 0.2);
+            padding: 8px 12px;
+        }
+
+        .step-conditional:not(.collapsed) {
+            padding: 12px;
         }
 
         .conditional-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            cursor: pointer;
+        }
+
+        .step-conditional:not(.collapsed) .conditional-header {
             margin-bottom: 8px;
+        }
+
+        .conditional-expand-hint {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            opacity: 0.6;
+        }
+
+        .step-conditional:not(.collapsed) .conditional-expand-hint {
+            display: none;
         }
 
         .conditional-label {
@@ -843,48 +867,47 @@
             const isConditional = step.conditional && step.conditional.enabled;
             const condType = step.conditional?.type || 'if_present';
             const condValue = step.conditional?.value || step.target?.text || '';
+            // Collapsed by default unless conditional is enabled
+            const isCollapsed = !isConditional;
 
             return `
-                <div class="step-conditional">
-                    <div class="conditional-header">
+                <div class="step-conditional ${isCollapsed ? 'collapsed' : ''}" data-step-id="${step.id}">
+                    <div class="conditional-header" onclick="toggleConditionalExpand('${step.id}'); event.stopPropagation();">
                         <span class="conditional-label">
                             ⚡ CONDITIONAL
+                            <span class="conditional-expand-hint">(click to expand)</span>
                         </span>
                         <input type="checkbox" class="conditional-toggle"
                                ${isConditional ? 'checked' : ''}
-                               onchange="toggleConditional('${step.id}', this.checked); event.stopPropagation();">
+                               onchange="toggleConditional('${step.id}', this.checked); event.stopPropagation();"
+                               onclick="event.stopPropagation();">
                     </div>
-                    ${isConditional ? `
-                        <div class="conditional-config">
-                            <div class="conditional-field">
-                                <label>Type:</label>
-                                <!-- Note: if_all_present and if_any_present are not included because they require
-                                     array input (multiple elements), which needs a different UI pattern (e.g.,
-                                     multi-select or tag input). These operators can be added manually in YAML. -->
-                                <select onchange="updateConditionalType('${step.id}', this.value); event.stopPropagation();">
-                                    <option value="if_present" ${condType === 'if_present' ? 'selected' : ''}>if_present</option>
-                                    <option value="if_absent" ${condType === 'if_absent' ? 'selected' : ''}>if_absent</option>
-                                    <option value="if_precondition" ${condType === 'if_precondition' ? 'selected' : ''}>if_precondition</option>
-                                    <option value="if_screen" ${condType === 'if_screen' ? 'selected' : ''}>if_screen</option>
-                                </select>
-                            </div>
-                            <div class="conditional-field">
-                                <label>${condType === 'if_precondition' ? 'Precondition:' : 'Check for:'}</label>
-                                ${condType === 'if_precondition' ? `
-                                    <select onchange="updateConditionalValue('${step.id}', this.value); event.stopPropagation();">
-                                        <option value="">Select...</option>
-                                        ${availablePreconditions.map(p =>
-                                            `<option value="${escapeHtml(p)}" ${condValue === p ? 'selected' : ''}>${escapeHtml(p)}</option>`
-                                        ).join('')}
-                                    </select>
-                                ` : `
-                                    <input type="text" value="${escapeHtml(condValue)}"
-                                           onchange="updateConditionalValue('${step.id}', this.value); event.stopPropagation();"
-                                           placeholder="${condType === 'if_screen' ? 'Screen description...' : 'Element text...'}">
-                                `}
-                            </div>
+                    <div class="conditional-config" ${isCollapsed ? 'style="display:none;"' : ''}>
+                        <div class="conditional-field">
+                            <label>Type:</label>
+                            <select onchange="updateConditionalType('${step.id}', this.value); event.stopPropagation();">
+                                <option value="if_present" ${condType === 'if_present' ? 'selected' : ''}>if_present</option>
+                                <option value="if_absent" ${condType === 'if_absent' ? 'selected' : ''}>if_absent</option>
+                                <option value="if_precondition" ${condType === 'if_precondition' ? 'selected' : ''}>if_precondition</option>
+                                <option value="if_screen" ${condType === 'if_screen' ? 'selected' : ''}>if_screen</option>
+                            </select>
                         </div>
-                    ` : ''}
+                        <div class="conditional-field">
+                            <label>${condType === 'if_precondition' ? 'Precondition:' : 'Check for:'}</label>
+                            ${condType === 'if_precondition' ? `
+                                <select onchange="updateConditionalValue('${step.id}', this.value); event.stopPropagation();">
+                                    <option value="">Select...</option>
+                                    ${availablePreconditions.map(p =>
+                                        `<option value="${escapeHtml(p)}" ${condValue === p ? 'selected' : ''}>${escapeHtml(p)}</option>`
+                                    ).join('')}
+                                </select>
+                            ` : `
+                                <input type="text" value="${escapeHtml(condValue)}"
+                                       onchange="updateConditionalValue('${step.id}', this.value); event.stopPropagation();"
+                                       placeholder="${condType === 'if_screen' ? 'Screen description...' : 'Element text...'}">
+                            `}
+                        </div>
+                    </div>
                 </div>
             `;
         }
@@ -941,6 +964,18 @@
         }
 
         // Conditional Management
+        function toggleConditionalExpand(stepId) {
+            const conditionalDiv = document.querySelector(`.step-conditional[data-step-id="${stepId}"]`);
+            if (conditionalDiv) {
+                const isCollapsed = conditionalDiv.classList.contains('collapsed');
+                conditionalDiv.classList.toggle('collapsed');
+                const config = conditionalDiv.querySelector('.conditional-config');
+                if (config) {
+                    config.style.display = isCollapsed ? 'flex' : 'none';
+                }
+            }
+        }
+
         function toggleConditional(stepId, enabled) {
             const step = steps.find(s => s.id === stepId);
             if (step) {

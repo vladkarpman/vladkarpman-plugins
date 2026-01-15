@@ -259,6 +259,12 @@ allowed-tools:
             • Ask: "Did you press Enter/Search?"
         - Update typing_sequences.json with user input
 
+    → Parallel Step Analysis (5 agents):
+        - Split steps into 5 batches
+        - Dispatch step-analyzer agents in parallel
+        - Each agent analyzes before/after frames for its batch
+        - Merge results into analysis.json
+
     → Verification Interview (optional):
         - Detect checkpoints (screen changes, long waits, navigation)
         - For each checkpoint:
@@ -663,6 +669,29 @@ Validates YAML test files for syntax, structure, and best practices.
 - Timing issues (race conditions)
 - Selector recommendations
 - Overall quality score
+
+### step-analyzer
+
+Analyzes batches of recording steps by comparing before/after frames.
+
+**When to use:**
+- Called internally by `/stop-recording` for parallel analysis
+- Not typically invoked directly by users
+
+**How it works:**
+- Receives a batch of step numbers to analyze
+- Reads before (300ms pre-tap) and after (300ms post-tap) frames
+- Generates descriptions: before state, action taken, after state
+- Suggests verifications for meaningful checkpoints
+
+**Parallel execution:**
+- `/stop-recording` splits steps into 5 batches
+- 5 step-analyzer agents run in parallel
+- Results merged into single analysis.json
+
+**Performance:**
+- Sequential: ~2 min for 30 steps (4s per step)
+- Parallel (5 agents): ~25 sec for 30 steps
 
 ## Common Development Tasks
 

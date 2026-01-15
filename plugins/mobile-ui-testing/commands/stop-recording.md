@@ -6,6 +6,7 @@ allowed-tools:
   - Write
   - Bash
   - Glob
+  - Task
   - AskUserQuestion
 ---
 
@@ -152,51 +153,65 @@ Store the list of screenshot files. Extract step numbers from filenames.
 
 **Count unique steps:** Each step has multiple before/after frames. Count unique step numbers.
 
-#### Step 8.3: Analyze Steps (Before/After Diff)
+#### Step 8.3: Analyze Steps in Parallel (5 Agents)
 
-For each unique step number, analyze the before and after frames to provide smart descriptions.
+Analyze steps using parallel agents for faster processing.
 
-**For each step {N} (formatted as 3-digit: 001, 002, etc.):**
+**Step 8.3.1: Calculate step batches**
 
-**Step 8.3.1: View before frame**
+Total steps: `{STEP_COUNT}` (from unique step numbers in Step 8.2)
 
-**Tool:** `Read` file `{TEST_FOLDER}/recording/screenshots/step_{N}_before_3.png`
+Split steps into 5 batches (or fewer if less than 5 steps):
+- Batch 1: steps 1 to ceil(N/5)
+- Batch 2: steps ceil(N/5)+1 to ceil(2N/5)
+- etc.
 
-This shows the screen state 300ms before the tap (frame index 3 = closest to tap).
+**Example:** 29 steps → batches of [1-6], [7-12], [13-18], [19-24], [25-29]
 
-**Step 8.3.2: View after frame**
+**Step 8.3.2: Dispatch parallel agents**
 
-**Tool:** `Read` file `{TEST_FOLDER}/recording/screenshots/step_{N}_after_3.png`
+**Tool:** `Task` with subagent_type="step-analyzer" (dispatch ALL agents in ONE message)
 
-This shows the screen state 300ms after the tap.
+Launch up to 5 agents in parallel. Each agent receives:
+```
+Analyze recording steps for test.
 
-**Step 8.3.3: Analyze and describe**
-
-Analyze both frames and create a description object:
-- `before`: Brief description of the screen state before the tap (1 sentence)
-- `action`: What element was tapped (identify button, text, area)
-- `after`: What changed after the tap (1 sentence)
-- `suggestedVerification`: Propose a verify_screen based on the change (null if no meaningful verification)
-
-**Store analysis** in memory for approval generation.
-
-**Example analysis for one step:**
-```json
-{
-  "before": "Calculator app with empty display",
-  "action": "Tapped '5' button on number pad",
-  "after": "Display now shows '5'",
-  "suggestedVerification": "Display shows the number 5"
-}
+test_folder: {TEST_FOLDER}
+step_numbers: [{BATCH_START}..{BATCH_END}]
+output_file: {TEST_FOLDER}/recording/analysis_batch_{N}.json
 ```
 
-**Guidelines for analysis:**
-- Keep descriptions concise (under 100 characters each)
-- Focus on user-visible changes
-- Suggested verification should describe expected state, not the action
-- Set suggestedVerification to null for transitional taps (navigation, scrolling)
+**CRITICAL:** Send all Task tool calls in a single message to enable parallel execution.
 
-**Repeat Step 8.3.1-8.3.3 for each step.**
+**Step 8.3.3: Collect and merge results**
+
+After all agents complete, read each batch file and merge:
+
+**Tool:** `Read` each `{TEST_FOLDER}/recording/analysis_batch_{N}.json`
+
+Merge all batch results into a single analysis object.
+
+**Example merged analysis:**
+```json
+{
+  "step_001": {
+    "analysis": {
+      "before": "Calculator app with empty display",
+      "action": "Tapped '5' button on number pad",
+      "after": "Display now shows '5'"
+    },
+    "suggestedVerification": "Display shows the number 5"
+  },
+  "step_002": {
+    "analysis": {
+      "before": "Display shows '5'",
+      "action": "Tapped '+' operator button",
+      "after": "Display shows '5 +'"
+    },
+    "suggestedVerification": null
+  }
+}
+```
 
 #### Step 8.4: Build Analysis Data
 

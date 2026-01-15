@@ -144,9 +144,21 @@ def get_video_duration(recording_folder: Path) -> str:
     return "0:30"
 
 
-def build_steps(touch_events: List[Dict[str, Any]], screenshots: Dict[str, Dict[str, List[str]]], analysis: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Build step objects from touch events."""
+def build_steps(touch_events: List[Dict[str, Any]], screenshots: Dict[str, Dict[str, List[str]]], analysis: Dict[str, Any], video_start_time: float = 0) -> List[Dict[str, Any]]:
+    """Build step objects from touch events.
+
+    Args:
+        touch_events: List of touch event dictionaries
+        screenshots: Dictionary mapping step numbers to screenshot paths
+        analysis: Dictionary mapping step IDs to analysis data
+        video_start_time: Unix timestamp when video recording started
+                         Used to convert absolute timestamps to video-relative
+    """
     steps = []
+
+    # If no video start time provided, use first touch event timestamp
+    if video_start_time == 0 and touch_events:
+        video_start_time = touch_events[0].get("timestamp", 0)
 
     for i, event in enumerate(touch_events):
         step_num = f"{i+1:03d}"
@@ -155,9 +167,13 @@ def build_steps(touch_events: List[Dict[str, Any]], screenshots: Dict[str, Dict[
         # Normalize gesture type (handle both "gesture" and "gesture_type" fields)
         gesture = event.get("gesture") or event.get("gesture_type", "tap")
 
+        # Convert absolute timestamp to video-relative time
+        abs_timestamp = event.get("timestamp", 0)
+        rel_timestamp = abs_timestamp - video_start_time if abs_timestamp > 0 else 0
+
         step: Dict[str, Any] = {
             "id": step_id,
-            "timestamp": event.get("timestamp", 0),
+            "timestamp": rel_timestamp,  # Now relative to video start
             "action": gesture,
             "target": {
                 "x": event.get("x"),
