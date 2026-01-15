@@ -273,14 +273,40 @@ def enrich_data(data: Dict[str, Any]) -> Dict[str, Any]:
             action = step.get("action", "")
             step["yamlCommand"] = extract_yaml_command(action)
 
-            # Parse tap coordinates for overlay indicator
+            # Detect verification steps (show single animation, not before/after)
+            step["isVerification"] = action.startswith("verify_")
+
+            # Handle new frame-based screenshots (before/after animation)
+            frames_before = step.get("frames_before", [])
+            frames_after = step.get("frames_after", [])
+
+            if frames_before or frames_after:
+                step["hasFrames"] = True
+
+                # Get last before frame for the action overlay
+                if frames_before:
+                    step["lastBeforeFrame"] = frames_before[-1]
+
+                # For verification steps: combine all frames into single animation
+                if step["isVerification"]:
+                    step["allFrames"] = frames_before + frames_after
+
+            # Handle tap coordinates from action_x/action_y (new format)
+            action_x = step.get("action_x")
+            action_y = step.get("action_y")
+            if action_x is not None and action_y is not None and screen_width and screen_height:
+                step["tapX"] = action_x
+                step["tapY"] = action_y
+                step["tapXPercent"] = round((action_x / screen_width) * 100, 1)
+                step["tapYPercent"] = round((action_y / screen_height) * 100, 1)
+
+            # Legacy: Parse tap coordinates from result string for backward compatibility
             result = step.get("result", "")
             tap_x, tap_y = parse_tap_coordinates(result)
-            if tap_x is not None and screen_width and screen_height:
+            if tap_x is not None and screen_width and screen_height and "tapX" not in step:
                 step["tapX"] = tap_x
                 step["tapY"] = tap_y
                 # Calculate percentage for CSS positioning
-                # Note: screenshot might be cropped, so use approximate positioning
                 step["tapXPercent"] = round((tap_x / screen_width) * 100, 1)
                 step["tapYPercent"] = round((tap_y / screen_height) * 100, 1)
 

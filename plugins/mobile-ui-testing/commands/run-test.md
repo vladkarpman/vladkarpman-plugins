@@ -7,8 +7,9 @@ allowed-tools:
   - Write
   - Bash
   - Glob
-  # screen-buffer-mcp (fast screenshots only)
+  # screen-buffer-mcp (fast screenshots + frame buffer)
   - mcp__screen-buffer__device_screenshot
+  - mcp__screen-buffer__device_get_frame
   # mobile-mcp (all device operations)
   - mcp__mobile-mcp__mobile_list_available_devices
   - mcp__mobile-mcp__mobile_get_screen_size
@@ -156,22 +157,38 @@ For each test in `{TESTS}`:
 3. For each step in test.steps:
    - `{STEP_COUNTER}` += 1
    - Output: `  [{STEP_COUNTER}/{total}] {action}`
-   - Execute action
+
+   **Capture BEFORE frames (if reporting enabled and `{SCREENSHOT_MODE}` = "all"):**
+
+   Capture 3 frames from screen-buffer showing UI state leading up to action:
+   ```bash
+   {REPORT_DIR}/screenshots/step_{STEP_COUNTER:03d}_before_1.png  # oldest (offset=2)
+   {REPORT_DIR}/screenshots/step_{STEP_COUNTER:03d}_before_2.png  # middle (offset=1)
+   {REPORT_DIR}/screenshots/step_{STEP_COUNTER:03d}_before_3.png  # newest (offset=0)
+   ```
+   **Tool:** `mcp__screen-buffer__device_get_frame` with offset=2, 1, 0
+
+   Note: screen-buffer maintains rolling buffer of last 10 frames. Frames are ~100ms apart.
+
+   - **Execute action** (tap, swipe, type, etc.)
    - Store result: `{STEP_RESULT}` = success message or error
+   - Store tap/swipe coordinates: `{ACTION_X}`, `{ACTION_Y}` (if applicable)
    - `{STEP_STATUS}` = "passed" or "failed"
 
-   **Capture screenshot (if reporting enabled):**
-   - **If `{SCREENSHOT_MODE}` = "all":** Always capture
-   - **If `{SCREENSHOT_MODE}` = "failures":** Only capture if `{STEP_STATUS}` = "failed"
+   **Capture AFTER frames (if reporting enabled):**
+   - **If `{SCREENSHOT_MODE}` = "all":** Capture 3 frames with 100ms delays
+   - **If `{SCREENSHOT_MODE}` = "failures":** Only if `{STEP_STATUS}` = "failed"
    - **If `{SCREENSHOT_MODE}` = "none":** Skip
 
-   **To capture:**
+   Capture 3 frames showing UI response after action:
    ```bash
-   {SCREENSHOT_PATH} = "{REPORT_DIR}/screenshots/step_{STEP_COUNTER:03d}.png"
+   {REPORT_DIR}/screenshots/step_{STEP_COUNTER:03d}_after_1.png  # immediate
+   # wait 100ms
+   {REPORT_DIR}/screenshots/step_{STEP_COUNTER:03d}_after_2.png  # +100ms
+   # wait 100ms
+   {REPORT_DIR}/screenshots/step_{STEP_COUNTER:03d}_after_3.png  # +200ms (final state)
    ```
-   **Tool:** `mcp__screen-buffer__device_screenshot` (fast, ~50ms)
-
-   Note: screen-buffer returns base64 PNG. Save to {SCREENSHOT_PATH} using Write tool or use `mcp__mobile-mcp__mobile_save_screenshot` if file saving is needed directly.
+   **Tool:** `mcp__screen-buffer__device_screenshot` (fast, ~50ms each)
 
    **Record step in report:**
    ```
@@ -180,7 +197,21 @@ For each test in `{TESTS}`:
      action: "{action description}",
      status: "{STEP_STATUS}",
      result: "{STEP_RESULT}",
-     screenshot: "screenshots/step_{STEP_COUNTER:03d}.png"  // relative path
+     // Before frames (animation leading to action)
+     frames_before: [
+       "screenshots/step_{STEP_COUNTER:03d}_before_1.png",
+       "screenshots/step_{STEP_COUNTER:03d}_before_2.png",
+       "screenshots/step_{STEP_COUNTER:03d}_before_3.png"
+     ],
+     // After frames (animation showing UI response)
+     frames_after: [
+       "screenshots/step_{STEP_COUNTER:03d}_after_1.png",
+       "screenshots/step_{STEP_COUNTER:03d}_after_2.png",
+       "screenshots/step_{STEP_COUNTER:03d}_after_3.png"
+     ],
+     // Tap/swipe coordinates for overlay indicator
+     action_x: {ACTION_X},  // null if not tap/swipe
+     action_y: {ACTION_Y}   // null if not tap/swipe
    })
    ```
 
