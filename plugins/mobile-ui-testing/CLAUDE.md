@@ -225,7 +225,7 @@ allowed-tools:
 ---
 ```
 
-## Recording Pipeline (Screenrecord-based)
+## Recording Pipeline
 
 **Requires:**
 - ffmpeg installed (`brew install ffmpeg`) for frame extraction
