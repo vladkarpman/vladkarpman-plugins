@@ -9,6 +9,7 @@ allowed-tools:
   - Bash
   - AskUserQuestion
   - mcp__mobile-mcp__mobile_list_available_devices
+  - mcp__screen-buffer__device_start_recording
 ---
 
 # Record Test - Start Recording User Actions
@@ -112,7 +113,6 @@ cat > .claude/recording-state.json << 'EOF'
   "startTime": "{CURRENT_ISO_TIMESTAMP}",
   "videoStartTime": {VIDEO_START_TIME},
   "status": "recording",
-  "videoPid": null,
   "touchPid": null
 }
 EOF
@@ -122,14 +122,14 @@ Replace placeholders with actual values.
 
 ### Step 8: Start Video Recording
 
-**Tool:** `Bash` with `run_in_background: true`
-```bash
-./scripts/record-video.sh {DEVICE_ID} tests/{TEST_NAME}/recording/recording.mp4 &
-echo "VIDEO_PID=$!"
+**Tool:** `mcp__screen-buffer__device_start_recording`
+```json
+{
+  "output_path": "tests/{TEST_NAME}/recording/recording.mp4"
+}
 ```
 
-**Read the background task output file** to get `VIDEO_PID=XXXXX`.
-Store the number as `{VIDEO_PID}`.
+Store the response confirmation. Recording is now active.
 
 ### Step 9: Start Touch Monitor
 
@@ -142,12 +142,11 @@ echo "TOUCH_PID=$!"
 **Read the background task output file** to get `TOUCH_PID=XXXXX`.
 Store the number as `{TOUCH_PID}`.
 
-### Step 10: Update Recording State with PIDs
+### Step 10: Update Recording State with PID
 
 **Tool:** `Read` then `Write` on `.claude/recording-state.json`
 
 Update the file to set:
-- `"videoPid": {VIDEO_PID}`
 - `"touchPid": {TOUCH_PID}`
 
 ### Step 11: Output Success Message
@@ -171,8 +170,6 @@ Interact with your app at normal speed.
 
 When done, say "stop" or use /stop-recording
 
-Note: Video recording has a 3-minute limit.
-
 ══════════════════════════════════════════════════════════
 ```
 
@@ -192,6 +189,5 @@ When user says "stop", "done", or uses `/stop-recording`:
 
 ## Notes
 
-- Video recording has a 3-minute limit (Android screenrecord limitation)
 - Touch events are captured in real-time to `touch_events.json`
 - Stopping the recording properly is critical - see `/stop-recording`
