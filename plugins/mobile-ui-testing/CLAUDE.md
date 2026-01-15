@@ -252,6 +252,31 @@ allowed-tools:
 **Key insight:** Extracting frames 100ms before each touch ensures vision sees
 what the user actually tapped, not the changed UI after the tap.
 
+## Approval UI
+
+After recording, an interactive browser-based approval UI opens instead of terminal Q&A.
+
+**Flow:**
+1. `/stop-recording` extracts frames and analyzes each step
+2. `approval.html` generated with embedded data
+3. Browser opens automatically
+4. User reviews Before → Action → After for each step
+5. User accepts/edits suggested verifications
+6. User clicks "Export YAML" to download test file
+
+**Features:**
+- Video scrubber with step markers
+- Before/Action/After frame display per step
+- Claude-generated analysis (what changed)
+- One-click verification suggestions
+- Reorder, delete, edit steps
+- Add new steps at any video timestamp
+- YAML export via download
+
+**Files:**
+- `templates/approval.html` - Interactive approval UI template
+- `scripts/generate-approval.py` - Generates HTML from recording data
+
 ## Conditional Logic (New in v3.2.0)
 
 Conditionals enable runtime branching without separate test files.
