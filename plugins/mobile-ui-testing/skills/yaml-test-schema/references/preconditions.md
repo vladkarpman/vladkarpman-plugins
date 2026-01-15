@@ -1,477 +1,129 @@
 # Preconditions Reference
 
-Preconditions define the required state before a test runs. The test runner automatically sets up the necessary state, making tests autonomous and reproducible.
+**Implementation Status:** ✅ Fully implemented
 
-## Philosophy
+Preconditions are named, reusable flows that establish specific app states before tests run. They enable consistent test setup and conditional branching based on app state.
 
-**Autonomous Tests:**
-```yaml
-tests:
-  - name: View profile page
-    preconditions:
-      - user_logged_in
-    steps:
-      - tap: "Profile"
-      - verify_screen: "Profile page with user info"
+## What is a Precondition?
+
+A precondition represents a known app state, such as:
+- `logged_in` - User is authenticated
+- `premium_user` - Premium features enabled
+- `fresh_install` - App data cleared
+- `onboarding_complete` - Tutorial finished
+
+## File Location
+
+```
+tests/
+├── preconditions/           # Precondition definitions
+│   ├── logged_in.yaml
+│   ├── premium_user.yaml
+│   └── fresh_install.yaml
+└── my-test/
+    └── test.yaml            # References preconditions
 ```
 
-The test runner ensures the user is logged in before running. No manual setup required.
-
-**Manual Setup (Old Way):**
-```yaml
-tests:
-  - name: View profile page
-    # Assumes user is already logged in manually
-    steps:
-      - tap: "Profile"
-      - verify_screen: "Profile page with user info"
-```
-
-This approach is fragile - tests fail if setup state is wrong.
-
-## Basic Syntax
-
-### Simple Preconditions
+## Precondition File Format
 
 ```yaml
-tests:
-  - name: Test name
-    preconditions:
-      - user_logged_in           # User must be authenticated
-      - onboarding_completed     # Onboarding must be finished
-      - network: connected       # Network must be available
-    steps:
-      - tap: "Button"
+name: premium_user
+description: "App state with premium features enabled"
+
+# Steps to reach this state
+steps:
+  - launch_app
+  - tap: "Debug Menu"
+  - tap: "Enable Premium"
+  - verify_screen: "Premium badge visible"
+
+# Runtime verification (for if_precondition checks)
+verify:
+  element: "Premium Badge"
+  # OR for complex states:
+  # screen: "Dashboard showing premium badge"
 ```
 
-### Explicit Preconditions
+**Fields:**
+- `name` (required): Identifier used to reference this precondition
+- `description` (optional): Human-readable explanation
+- `steps` (required): Actions to reach this state
+- `verify` (required): How to check if state is active at runtime
 
-```yaml
-tests:
-  - name: Test name
-    preconditions:
-      - user_logged_in:
-          account: premium_user  # Use specific test account
-      - min_photos: 5            # Need at least 5 photos in gallery
-      - device_storage:
-          min_free_mb: 100       # Need 100MB free space
-    steps:
-      - tap: "Upload"
+## Creating Preconditions
+
+**Command:** `/record-precondition {name}`
+
+```
+/record-precondition premium_user
+→ Recording starts (video + touch capture)
+→ User performs steps to reach premium state
+/stop-recording
+→ Generates tests/preconditions/premium_user.yaml
 ```
 
-## Built-in Preconditions
+## Using Preconditions
 
-### user_logged_in
-
-Ensures a user is logged in before test runs.
-
-**Simple form:**
-```yaml
-preconditions:
-  - user_logged_in
-```
-
-Uses default test account from config.
-
-**Explicit form:**
-```yaml
-preconditions:
-  - user_logged_in:
-      account: premium_user
-```
-
-Uses specific account defined in test config:
+### Single Precondition
 
 ```yaml
 config:
-  app: com.myapp
-  test_accounts:
-    default:
-      email: test@example.com
-      password: test123
-    premium_user:
-      email: premium@example.com
-      password: premium123
+  app: com.example.app
+  precondition: logged_in
 ```
 
-**How it works:**
-1. Check if user is already logged in (via screen analysis)
-2. If not, launch app and perform login flow
-3. Cache login state to avoid redundant logins
-
-### user_state
-
-Requires user to be in a specific state.
-
-```yaml
-preconditions:
-  - user_state: logged_out
-```
-
-**Supported states:**
-- `logged_in` - User authenticated
-- `logged_out` - User not authenticated
-- `onboarding_pending` - Onboarding not completed
-
-### min_photos
-
-Requires minimum number of photos in app's photo library.
-
-```yaml
-preconditions:
-  - min_photos: 3
-```
-
-**How it works:**
-1. Navigate to photo gallery
-2. Count available photos
-3. If count < minimum, upload placeholder photos from test assets
-
-**Configuration:**
-```yaml
-config:
-  test_data:
-    photo_dir: ./test-assets/photos  # Directory with test photos
-```
-
-### onboarding_completed
-
-Ensures onboarding flow is completed.
-
-```yaml
-preconditions:
-  - onboarding_completed
-```
-
-**How it works:**
-1. Check if onboarding screen is visible
-2. If yes, click through onboarding screens to completion
-3. Cache completion state
-
-### network
-
-Controls network connectivity state.
-
-```yaml
-preconditions:
-  - network: connected    # Require internet
-  - network: disconnected # Require no internet
-  - network: wifi         # Require WiFi connection
-```
-
-**How it works:**
-- Uses device API to enable/disable network
-- Verifies connectivity state before proceeding
-
-### device_storage
-
-Requires minimum free storage space.
-
-```yaml
-preconditions:
-  - device_storage:
-      min_free_mb: 100
-```
-
-**How it works:**
-1. Check available storage via device API
-2. If insufficient, clear app cache/data to free space
-3. Fail test if still insufficient after cleanup
-
-## Configuration
-
-Define test accounts and data in `config` section:
+### Multiple Preconditions (Sequential)
 
 ```yaml
 config:
-  app: com.myapp
-
-  test_accounts:
-    default:
-      email: test@example.com
-      password: test123
-    premium_user:
-      email: premium@example.com
-      password: premium123
-    admin:
-      email: admin@example.com
-      password: admin123
-
-  test_data:
-    photo_dir: ./test-assets/photos
-    video_dir: ./test-assets/videos
-
-  env:
-    api_base_url: https://staging.api.example.com
-    feature_flags:
-      new_ui: true
+  app: com.example.app
+  preconditions:
+    - fresh_install
+    - logged_in
+    - premium_user
 ```
 
-## Failure Handling
+Preconditions run in order, each building on previous state.
 
-Control what happens when precondition setup fails:
+## Execution Order
+
+```
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│ fresh_install│ → │  logged_in   │ → │ TEST STEPS   │
+└──────────────┘    └──────────────┘    └──────────────┘
+```
+
+1. All preconditions run in specified order
+2. No app restart between (unless precondition does it)
+3. Precondition failure stops test execution
+4. Then test steps execute
+
+## Conditional Checking
+
+Use `if_precondition` to branch based on active precondition:
 
 ```yaml
-preconditions:
-  - user_logged_in:
-      on_failure: skip  # Skip test if login fails
-
-  - min_photos: 5
-      on_failure: fail  # Fail test if can't prepare photos
-
-  - network: connected
-      on_failure: warn  # Continue with warning if network unavailable
+- if_precondition: premium_user
+  then:
+    - tap: "Premium Features"
+    - verify_screen: "Full feature list"
+  else:
+    - verify_screen: "Upgrade prompt"
 ```
 
-**Options:**
-- `fail` (default) - Fail the test immediately
-- `skip` - Skip test and mark as skipped
-- `warn` - Log warning but continue test execution
-
-## Execution Flow
-
-```
-Test Start
-    ↓
-Check Preconditions
-    ↓
-┌─────────────────────┐
-│ user_logged_in      │
-│  ├─ Check state     │
-│  ├─ Login if needed │
-│  └─ Verify success  │
-└─────────────────────┘
-    ↓
-┌─────────────────────┐
-│ min_photos: 3       │
-│  ├─ Count photos    │
-│  ├─ Upload if < 3   │
-│  └─ Verify count    │
-└─────────────────────┘
-    ↓
-All Preconditions Met
-    ↓
-Run Test Steps
-```
-
-## Advanced Examples
-
-### Multiple Test Accounts
-
-```yaml
-config:
-  app: com.chat.app
-  test_accounts:
-    user_a:
-      email: alice@example.com
-      password: alice123
-    user_b:
-      email: bob@example.com
-      password: bob123
-
-tests:
-  - name: Send message between users
-    preconditions:
-      - user_logged_in:
-          account: user_a
-    steps:
-      - tap: "Contacts"
-      - tap: "Bob"
-      - type: "Hello Bob!"
-      - tap: "Send"
-
-  - name: Receive message
-    preconditions:
-      - user_logged_in:
-          account: user_b
-    steps:
-      - verify_screen: "New message from Alice"
-```
-
-### Conditional Preconditions
-
-```yaml
-tests:
-  - name: Upload photo (online only)
-    preconditions:
-      - user_logged_in
-      - network: connected
-      - min_photos: 1
-    steps:
-      - tap: "Upload"
-      - tap: "Select Photo"
-      - verify_screen: "Upload successful"
-
-  - name: View cached photos (offline)
-    preconditions:
-      - user_logged_in
-      - network: disconnected
-      - min_photos: 3
-    steps:
-      - tap: "Gallery"
-      - verify_screen: "3 photos visible"
-```
-
-### Data Preparation
-
-```yaml
-config:
-  test_data:
-    photo_dir: ./test-assets/photos
-    profiles:
-      complete:
-        name: "John Doe"
-        bio: "Test user"
-        avatar: profile.jpg
-
-tests:
-  - name: Edit profile with photo
-    preconditions:
-      - user_logged_in
-      - min_photos: 1
-      - user_profile: complete
-    steps:
-      - tap: "Edit Profile"
-      - verify_screen: "Profile form with photo"
-```
+The check uses the precondition's `verify` section:
+- If `verify.element` specified: Check if element is present
+- If `verify.screen` specified: AI vision check against description
 
 ## Best Practices
 
-### DO:
+**DO:**
+- Keep preconditions focused (one state per precondition)
+- Use descriptive names (`logged_in_as_admin` vs `admin`)
+- Include verification step in precondition to confirm state
+- Use `verify.element` for fast checks, `verify.screen` for complex states
 
-✅ **Use preconditions for test independence**
-```yaml
-tests:
-  - name: Each test sets its own preconditions
-    preconditions:
-      - user_logged_in
-      - min_photos: 3
-```
-
-✅ **Define reusable test accounts**
-```yaml
-config:
-  test_accounts:
-    default: { email: test@example.com, password: test123 }
-    premium: { email: premium@example.com, password: premium123 }
-```
-
-✅ **Use specific preconditions**
-```yaml
-preconditions:
-  - user_logged_in:
-      account: premium_user
-  - min_photos: 5
-```
-
-✅ **Handle failures appropriately**
-```yaml
-preconditions:
-  - network: connected
-    on_failure: skip  # Skip test if no network
-```
-
-### DON'T:
-
-❌ **Don't rely on manual setup**
-```yaml
-# BAD: Assumes user is already logged in
-tests:
-  - name: View profile
-    steps:
-      - tap: "Profile"
-```
-
-❌ **Don't duplicate setup in every test**
-```yaml
-# BAD: Login steps repeated in each test
-tests:
-  - name: Test 1
-    steps:
-      - tap: "Login"
-      - type: "test@example.com"
-      - tap: "Submit"
-      - tap: "Feature 1"
-
-  - name: Test 2
-    steps:
-      - tap: "Login"
-      - type: "test@example.com"
-      - tap: "Submit"
-      - tap: "Feature 2"
-```
-
-Use preconditions instead:
-```yaml
-# GOOD: Precondition handles login
-tests:
-  - name: Test 1
-    preconditions:
-      - user_logged_in
-    steps:
-      - tap: "Feature 1"
-
-  - name: Test 2
-    preconditions:
-      - user_logged_in
-    steps:
-      - tap: "Feature 2"
-```
-
-❌ **Don't use preconditions for test steps**
-```yaml
-# BAD: This is a test action, not a precondition
-preconditions:
-  - navigate_to_settings
-```
-
-Preconditions set up state, not perform test actions.
-
-❌ **Don't hardcode credentials in steps**
-```yaml
-# BAD: Credentials in test steps
-steps:
-  - tap: "Email"
-  - type: "test@example.com"
-  - tap: "Password"
-  - type: "test123"
-```
-
-Use preconditions:
-```yaml
-# GOOD: Credentials in config
-config:
-  test_accounts:
-    default:
-      email: test@example.com
-      password: test123
-
-tests:
-  - name: Test
-    preconditions:
-      - user_logged_in
-```
-
-## Implementation Status
-
-### Phase 1: Core Preconditions (Planned)
-
-- `user_logged_in` - Basic login support
-- `user_state` - Login state control
-- `onboarding_completed` - Onboarding flow completion
-
-### Phase 2: Data Preconditions (Planned)
-
-- `min_photos` - Photo gallery preparation
-- `min_contacts` - Contact list preparation
-- `device_storage` - Storage management
-
-### Phase 3: Environment Preconditions (Planned)
-
-- `network` - Network state control
-- `location` - GPS/location mocking
-- `permissions` - App permission grants
-
-**Current Status:** Design complete, implementation not yet started.
-
-See `docs/verification-interview-design.md` for full implementation plan.
+**DON'T:**
+- Create overly complex preconditions (split into multiple)
+- Skip the `verify` section (needed for `if_precondition`)
+- Chain too many preconditions (consider separate test files)
