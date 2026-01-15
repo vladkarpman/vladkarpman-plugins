@@ -1,7 +1,8 @@
 # Test artifacts (generated tests only)
-# Ignore all tests/* except integration tests
+# Ignore all tests/* except integration tests and preconditions
 tests/*
 !tests/integration/
+!tests/preconditions/
 
 # Recording state (temporary)
 .claude/recording-state.json
