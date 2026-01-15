@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **App State Management Actions** - New actions for managing app state during tests:
+  - `clear_app_data` - Clears all app data (cache, preferences, databases, files) via `adb shell pm clear`
+  - `revoke_permissions` - Revokes all runtime permissions via `adb shell pm reset-permissions -p`
+  - Both actions default to `config.app`, can override with explicit package name
+  - Useful for testing first-run experiences and permission flows
+
 ## [3.3.1] - 2026-01-13
 
 ### Changed
