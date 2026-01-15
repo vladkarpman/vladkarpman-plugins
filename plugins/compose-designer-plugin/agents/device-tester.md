@@ -258,11 +258,10 @@ theme_composable="${config.theme.composable:-}"
 if [ -n "$theme_composable" ]; then
   # Extract simple name from full path (e.g., "AppTheme" from "com.myapp.ui.theme.AppTheme")
   theme_composable_name=$(echo "$theme_composable" | sed 's/.*\.//')
-  theme_import="import $theme_composable"
   echo "Using project theme: $theme_composable_name"
 else
+  # MaterialTheme is already imported via androidx.compose.material3.MaterialTheme
   theme_composable_name="MaterialTheme"
-  theme_import=""
   echo "Using default MaterialTheme"
 fi
 ```

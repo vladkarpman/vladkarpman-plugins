@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Approve Test - {{testName}}</title>
+    <style>
+        :root {
+            --pass-color: #10b981;
+            --fail-color: #ef4444;
+            --skip-color: #6b7280;
+            --bg-primary: #111827;
+            --bg-secondary: #1f2937;
+            --bg-tertiary: #374151;
+            --text-primary: #f9fafb;
+            --text-secondary: #9ca3af;
+            --border-color: #4b5563;
+            --accent-color: #3b82f6;
+            --action-tap: #f59e0b;
+            --action-verify: #8b5cf6;
+            --action-type: #06b6d4;
+            --action-wait: #6b7280;
+            --action-swipe: #ec4899;
+            --warning-color: #f59e0b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header h1 {
+            font-size: 1.25rem;
+            font-weight: 500;
+        }
+
+        .header-meta {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--accent-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-color);
+        }
+
+        .btn-danger {
+            background: var(--fail-color);
+            color: white;
+        }
+
+        /* Main Layout - Two Panels */
+        .main {
+            display: flex;
+            height: calc(100vh - 65px);
+        }
+
+        .video-panel {
+            width: 45%;
+            padding: 24px;
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .steps-panel {
+            width: 55%;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        /* Video Player */
+        .video-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .video-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .video-wrapper video {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        .video-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .video-timeline {
+            position: relative;
+            height: 40px;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .video-progress {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: var(--accent-color);
+            opacity: 0.3;
+            border-radius: 4px;
+        }
+
+        .video-marker {
+            position: absolute;
+            top: 0;
+            width: 3px;
+            height: 100%;
+            background: var(--action-tap);
+            cursor: pointer;
+        }
+
+        .video-marker:hover {
+            background: var(--warning-color);
+        }
+
+        .video-time {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .add-step-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .add-step-buttons .btn {
+            flex: 1;
+            font-size: 0.75rem;
+            padding: 6px 12px;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div>
+            <h1>Approve: {{testName}}</h1>
+            <div class="header-meta">{{stepCount}} steps recorded</div>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="discardTest()">Discard</button>
+            <button class="btn btn-primary" onclick="exportYAML()">Export YAML</button>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="video-panel">
+            <div class="video-container">
+                <div class="video-wrapper">
+                    <video id="video" src="{{videoFile}}" controls></video>
+                </div>
+                <div class="video-controls">
+                    <div class="video-timeline" id="timeline" onclick="seekToPosition(event)">
+                        <div class="video-progress" id="progress"></div>
+                        <!-- Step markers injected by JS -->
+                    </div>
+                    <div class="video-time">
+                        <span id="currentTime">0:00</span>
+                        <span id="duration">{{videoDuration}}</span>
+                    </div>
+                </div>
+                <div class="add-step-buttons">
+                    <button class="btn btn-secondary" onclick="addStep('verify_screen')">+ verify_screen</button>
+                    <button class="btn btn-secondary" onclick="addStep('wait_for')">+ wait_for</button>
+                    <button class="btn btn-secondary" onclick="addStep('wait')">+ wait</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="steps-panel" id="stepsPanel">
+            <!-- Steps rendered by JS -->
+        </div>
+    </main>
+
+    <script>
+        // Data embedded during generation
+        const testData = {{testDataJSON}};
+
+        // Will be populated in Task 3
+    </script>
+</body>
+</html>
