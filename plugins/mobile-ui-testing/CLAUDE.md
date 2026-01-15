@@ -273,6 +273,12 @@ After recording, an interactive browser-based approval UI opens instead of termi
 - Add new steps at any video timestamp
 - YAML export via download
 
+**Conditional editing:**
+- Toggle "Conditional" on any step
+- Select condition type (if_present, if_absent, if_precondition, if_screen)
+- Set condition value
+- Export generates proper if/then YAML structure
+
 **Files:**
 - `templates/approval.html` - Interactive approval UI template
 - `scripts/generate-approval.py` - Generates HTML from recording data
@@ -281,12 +287,15 @@ After recording, an interactive browser-based approval UI opens instead of termi
 
 Conditionals enable runtime branching without separate test files.
 
-**5 Operators:**
-- `if_exists` - Single element check
-- `if_not_exists` - Inverse element check
-- `if_all_exist` - Multiple elements (AND logic)
-- `if_any_exist` - Multiple elements (OR logic)
+**6 Operators:**
+- `if_present` - Single element check
+- `if_absent` - Inverse element check
+- `if_all_present` - Multiple elements (AND logic)
+- `if_any_present` - Multiple elements (OR logic)
 - `if_screen` - AI vision-based screen matching
+- `if_precondition` - Check if a named precondition is active
+
+**Backward compatibility:** Old operator names (`if_exists`, `if_not_exists`, `if_all_exist`, `if_any_exist`) are still supported but deprecated. Use the new names for clarity.
 
 **Key Features:**
 - Full nesting support (unlimited depth)
@@ -300,6 +309,60 @@ Conditionals enable runtime branching without separate test files.
 - Reference docs in `skills/yaml-test-schema/references/conditionals.md`
 
 **Design:** See `docs/plans/2026-01-13-conditional-logic-implementation.md`
+
+## Preconditions (New in v3.5+)
+
+Preconditions are reusable flows that establish specific app states before tests run.
+
+**Creating preconditions:**
+```bash
+/record-precondition premium_user
+# Record steps to reach premium state
+/stop-recording
+# Generates tests/preconditions/premium_user.yaml
+```
+
+**File location:** `tests/preconditions/{name}.yaml`
+
+**File format:**
+```yaml
+name: premium_user
+description: "Premium features enabled"
+
+steps:
+  - launch_app
+  - tap: "Debug Menu"
+  - tap: "Enable Premium"
+
+verify:
+  element: "Premium Badge"
+```
+
+**Using in tests:**
+```yaml
+config:
+  app: com.example.app
+  precondition: premium_user
+  # OR multiple:
+  preconditions:
+    - logged_in
+    - premium_user
+```
+
+**Conditional check:**
+```yaml
+- if_precondition: premium_user
+  then:
+    - tap: "Premium Feature"
+  else:
+    - verify_screen: "Upgrade prompt"
+```
+
+**Precondition execution flow:**
+1. Before test runs, precondition steps are executed
+2. `verify` field validates precondition was successful
+3. Test continues only if verification passes
+4. Precondition state is tracked for `if_precondition` checks
 
 ## Test Folder Structure (v3.3+)
 
@@ -460,7 +523,7 @@ cd tests/integration
 
 **Test coverage:**
 - Basic operations (tap, type, wait_for, verify_screen)
-- Conditional operators (if_exists, if_not_exists, if_all_exist, if_any_exist, if_screen)
+- Conditional operators (if_present, if_absent, if_all_present, if_any_present, if_screen, if_precondition)
 - Flow control (retry, repeat)
 - Error recovery and element not found handling
 - Multi-step calculations with verification
@@ -664,7 +727,7 @@ allowed-tools:
 Implementation details and architectural decisions documented in `docs/plans/`:
 
 - **screen-buffer-integration.md** - Migration to screen-buffer-mcp for fast screenshots
-- **conditional-logic-implementation.md** - Conditional operators design (if_exists, if_screen, etc.)
+- **conditional-logic-implementation.md** - Conditional operators design (if_present, if_screen, etc.)
 - **verification-interview-design.md** - AI-guided verification workflow and checkpoint detection
 - **keyboard-typing-detection.md** - Typing detection heuristics and interview flow
 - **recording-reorganization.md** - Test folder structure evolution (v1.0 → v3.3+)

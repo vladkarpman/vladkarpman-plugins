@@ -475,15 +475,16 @@ Note: The `tests/` folder is gitignored - test artifacts are local only.
 | Action | Example | Description |
 |--------|---------|-------------|
 | `wait_for` | `- wait_for: "Continue"` | Wait until element appears (10s timeout) |
-| `if_exists` | `- if_exists: "Button"` | Execute then/else based on element presence |
-| `if_not_exists` | `- if_not_exists: "Error"` | Execute if element not present |
-| `if_all_exist` | `- if_all_exist: ["A", "B"]` | Execute if ALL elements exist (AND) |
-| `if_any_exist` | `- if_any_exist: ["A", "B"]` | Execute if ANY element exists (OR) |
+| `if_present` | `- if_present: "Button"` | Execute then/else based on element presence |
+| `if_absent` | `- if_absent: "Error"` | Execute if element not present |
+| `if_all_present` | `- if_all_present: ["A", "B"]` | Execute if ALL elements present (AND) |
+| `if_any_present` | `- if_any_present: ["A", "B"]` | Execute if ANY element present (OR) |
 | `if_screen` | `- if_screen: "Login page"` | Execute based on AI vision screen match |
+| `if_precondition` | `- if_precondition: "logged_in"` | Execute based on precondition state |
 | `retry` | `- retry: {attempts: 3, steps: [...]}` | Retry steps on failure |
 | `repeat` | `- repeat: {times: 5, steps: [...]}` | Repeat steps N times |
 
-**Note:** `if_present` is deprecated. Use `if_exists` for better error handling and nesting support.
+**Backward compatibility:** Old operator names (`if_exists`, `if_not_exists`, `if_all_exist`, `if_any_exist`) are still supported but deprecated. Use the new names for clarity.
 
 **Note:** All conditional operators (`if_*`) require `then` and optional `else` blocks. See [Conditional Logic](#conditional-logic) section for complete syntax.
 
@@ -494,7 +495,7 @@ Execute steps conditionally based on runtime state. All conditionals support ful
 ### Basic Conditional
 
 ```yaml
-- if_exists: "Skip Tutorial"
+- if_present: "Skip Tutorial"
   then:
     - tap: "Skip Tutorial"
   else:
@@ -505,7 +506,7 @@ Execute steps conditionally based on runtime state. All conditionals support ful
 
 ```yaml
 # Check if ALL buttons are present
-- if_all_exist: ["Save", "Share", "Edit"]
+- if_all_present: ["Save", "Share", "Edit"]
   then:
     - verify_screen: "Full editor mode active"
   else:
@@ -516,7 +517,7 @@ Execute steps conditionally based on runtime state. All conditionals support ful
 
 ```yaml
 # Check if ANY login button variant exists
-- if_any_exist: ["Login", "Sign In", "Get Started"]
+- if_any_present: ["Login", "Sign In", "Get Started"]
   then:
     - tap: "Login"
   else:
@@ -539,7 +540,7 @@ Execute steps conditionally based on runtime state. All conditionals support ful
 
 ```yaml
 # Conditionals can be nested
-- if_exists: "Premium Badge"
+- if_present: "Premium Badge"
   then:
     - if_screen: "Advanced tools visible"
       then:
@@ -669,14 +670,14 @@ tests:
       - wait_for: "Login"
 
       # Handle optional notification permission popup
-      - if_exists: "Allow Notifications"
+      - if_present: "Allow Notifications"
         then:
           - tap: "Not Now"
         else:
           - verify_screen: "No permission prompt"
 
       # Handle optional rate app dialog
-      - if_exists: "Rate our app"
+      - if_present: "Rate our app"
         then:
           - tap: "Later"
         else:
@@ -730,7 +731,7 @@ What's the best way to test login flows?
 - [Actions Reference](skills/yaml-test-schema/references/actions.md) - All available actions
 - [Assertions Reference](skills/yaml-test-schema/references/assertions.md) - Verification actions
 - [Flow Control Reference](skills/yaml-test-schema/references/flow-control.md) - wait_for, retry, repeat
-- [Conditionals Reference](skills/yaml-test-schema/references/conditionals.md) - if_exists, if_not_exists, if_all_exist, if_any_exist, if_screen
+- [Conditionals Reference](skills/yaml-test-schema/references/conditionals.md) - if_present, if_absent, if_all_present, if_any_present, if_screen, if_precondition
 
 ## Troubleshooting
 
