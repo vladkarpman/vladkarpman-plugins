@@ -7,8 +7,10 @@ allowed-tools:
   - Write
   - Bash
   - Glob
-  # screen-buffer-mcp (screenshots for verification only)
+  # screen-buffer-mcp (screenshots for verification, video recording for reports)
   - mcp__screen-buffer__device_screenshot
+  - mcp__screen-buffer__device_start_recording
+  - mcp__screen-buffer__device_stop_recording
   # mobile-mcp (all device operations)
   - mcp__mobile-mcp__mobile_list_available_devices
   - mcp__mobile-mcp__mobile_get_screen_size
@@ -25,7 +27,6 @@ allowed-tools:
   - mcp__mobile-mcp__mobile_open_url
   - mcp__mobile-mcp__mobile_set_orientation
   - mcp__mobile-mcp__mobile_get_orientation
-  - mcp__mobile-mcp__mobile_take_screenshot
   - mcp__mobile-mcp__mobile_save_screenshot
 ---
 
@@ -122,16 +123,16 @@ python3 -c "import time; print(time.time())"
 
 Store the timestamp output as `{VIDEO_START_TIME}` (e.g., `1768233811.7967029`).
 
-**Start video recording in background:**
+**Start video recording:**
 
-**Tool:** `Bash` with `run_in_background: true`
-```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/record-video.sh" "{DEVICE_ID}" "{REPORT_DIR}/recording/recording.mp4" &
-echo "VIDEO_PID=$!"
+**Tool:** `mcp__screen-buffer__device_start_recording`
+```json
+{
+  "output_path": "{REPORT_DIR}/recording/recording.mp4"
+}
 ```
 
-Read the background task output file to get `VIDEO_PID=XXXXX`.
-Store the number as `{VIDEO_PID}`.
+Store confirmation that recording started.
 
 Initialize step timestamp tracking:
 ```
@@ -339,21 +340,13 @@ For each step in `{TEARDOWN_STEPS}`:
 
 1. **Stop video recording:**
 
-   **Tool:** `Bash`
-   ```bash
-   # Send SIGINT to screenrecord - this writes the moov atom and finalizes the file
-   adb -s "{DEVICE_ID}" shell pkill -2 screenrecord
+   **Tool:** `mcp__screen-buffer__device_stop_recording`
+   ```json
+   {}
    ```
 
-   **Wait for video script to complete:**
-   ```bash
-   # Wait for recording script to finish (pulls video from device)
-   for i in {1..30}; do
-       kill -0 {VIDEO_PID} 2>/dev/null || break
-       sleep 1
-   done
-   echo "Video script completed"
-   ```
+   This stops the recording and finalizes the video file.
+   Video is saved at: `{REPORT_DIR}/recording/recording.mp4`
 
 2. **Write step timestamps for frame extraction:**
 
