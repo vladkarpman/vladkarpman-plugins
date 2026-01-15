@@ -19,6 +19,23 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
+def find_available_preconditions(base_path: Path) -> List[str]:
+    """Find all available precondition names.
+
+    Preconditions are stored in tests/preconditions/{name}.yaml.
+    The base_path is the recording folder (tests/{test-name}/recording/),
+    so we navigate up to tests/ and into preconditions/.
+    """
+    preconditions_dir = base_path.parent.parent / "preconditions"
+    if not preconditions_dir.exists():
+        return []
+
+    preconditions = []
+    for f in preconditions_dir.glob("*.yaml"):
+        preconditions.append(f.stem)
+    return sorted(preconditions)
+
+
 def get_template_path() -> Path:
     """Get path to HTML template."""
     plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT", "")
@@ -204,7 +221,8 @@ def main() -> None:
             "appPackage": args.app_package or "com.example.app",
             "videoFile": "recording/recording.mp4",
             "videoDuration": video_duration,
-            "steps": build_steps(touch_events, screenshots, analysis)
+            "steps": build_steps(touch_events, screenshots, analysis),
+            "availablePreconditions": find_available_preconditions(recording_folder)
         }
 
         # Generate HTML
