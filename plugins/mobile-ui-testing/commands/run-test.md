@@ -384,21 +384,23 @@ When action uses element text (e.g., `tap: "Login"`):
 Conditionals check current state and execute branches accordingly.
 
 **Detection:**
-- Step has key starting with `if_` (if_exists, if_not_exists, if_all_exist, if_any_exist, if_screen)
+- Step has key starting with `if_` (if_present, if_absent, if_all_present, if_any_present, if_screen, if_precondition)
+- Legacy operators still supported: if_exists (→if_present), if_not_exists (→if_absent), if_all_exist (→if_all_present), if_any_exist (→if_any_present)
 - Step has `then` key (required)
 - Step may have `else` key (optional)
 
 **Evaluation Process:**
 
 1. **Parse conditional:**
-   - Extract operator: `if_exists`, `if_not_exists`, `if_all_exist`, `if_any_exist`, `if_screen`
+   - Extract operator: `if_present`, `if_absent`, `if_all_present`, `if_any_present`, `if_screen`, `if_precondition`
+   - Map legacy operators: if_exists→if_present, if_not_exists→if_absent, if_all_exist→if_all_present, if_any_exist→if_any_present
    - Extract condition value: element text(s) or screen description
    - Extract `then` steps array (required)
    - Extract `else` steps array (optional)
 
 2. **Evaluate condition:**
 
-   **For element-based operators (if_exists, if_not_exists, if_all_exist, if_any_exist):**
+   **For element-based operators (if_present, if_absent, if_all_present, if_any_present):**
    - **Tool:** `mcp__mobile-mcp__mobile_list_elements_on_screen` (device={DEVICE_ID})
    - Get current elements list (instant check, no retries - *Rationale: Conditionals check current state at a point in time, unlike element actions which wait for UI to stabilize. If element might be loading, use `wait_for` before the conditional*)
    - Parse elements array
@@ -419,11 +421,20 @@ Conditionals check current state and execute branches accordingly.
 
 | Operator | True When | False When |
 |----------|-----------|------------|
-| `if_exists: "X"` | Element with text "X" found in elements list | Element not found |
-| `if_not_exists: "X"` | Element with text "X" NOT in elements list | Element found |
-| `if_all_exist: ["A","B"]` | ALL elements found (A AND B) | Any element missing |
-| `if_any_exist: ["A","B"]` | At least ONE element found (A OR B) | No elements found |
+| `if_present: "X"` | Element with text "X" found in elements list | Element not found |
+| `if_absent: "X"` | Element with text "X" NOT in elements list | Element found |
+| `if_all_present: ["A","B"]` | ALL elements found (A AND B) | Any element missing |
+| `if_any_present: ["A","B"]` | At least ONE element found (A OR B) | No elements found |
 | `if_screen: "desc"` | AI analysis returns "matches description" | AI returns "doesn't match" |
+| `if_precondition: "name"` | Precondition verify check passes (see Step 6.5) | Verify check fails |
+
+**Legacy operator mapping (for backward compatibility):**
+| Legacy | Maps To |
+|--------|---------|
+| `if_exists` | `if_present` |
+| `if_not_exists` | `if_absent` |
+| `if_all_exist` | `if_all_present` |
+| `if_any_exist` | `if_any_present` |
 
 **Element Matching:**
 - Case-insensitive text matching
@@ -466,7 +477,7 @@ Conditionals check current state and execute branches accordingly.
 ```
 [1/8] tap "Start"
 [2/8] wait 2s
-[3/8] if_exists "Dialog"
+[3/8] if_present "Dialog"
       ✓ Condition true, executing then branch (2 steps)
 [3.1/8] tap "OK"
 [3.2/8] verify_screen "Dialog closed"
@@ -475,7 +486,7 @@ Conditionals check current state and execute branches accordingly.
 
 Condition true:
 ```
-  [3/8] if_exists "Upgrade Dialog"
+  [3/8] if_present "Upgrade Dialog"
         ✓ Condition true, executing then branch (2 steps)
   [3.1/8] tap "Maybe Later"
         ✓ Tapped at (540, 800)
@@ -485,7 +496,7 @@ Condition true:
 
 Condition false with else:
 ```
-  [4/8] if_not_exists "Premium Badge"
+  [4/8] if_absent "Premium Badge"
         ✓ Condition false, executing else branch (1 step)
   [4.1/8] verify_screen "Free tier active"
         ✓ Screen matches description
@@ -493,7 +504,7 @@ Condition false with else:
 
 Condition false without else:
 ```
-  [5/8] if_any_exist ["Login", "Sign In"]
+  [5/8] if_any_present ["Login", "Sign In"]
         ℹ Condition false, skipping (no else branch)
 ```
 
@@ -501,7 +512,7 @@ Condition false without else:
 
 Simple dialog handling:
 ```yaml
-- if_exists: "Watch Ad to Continue"
+- if_present: "Watch Ad to Continue"
   then:
     - tap: "Watch Ad"
     - wait_for: "Continue"
@@ -511,10 +522,10 @@ Simple dialog handling:
 
 Nested conditionals:
 ```yaml
-- if_exists: "Premium Features"
+- if_present: "Premium Features"
   then:
     - tap: "Premium Features"
-    - if_exists: "Confirm Purchase"
+    - if_present: "Confirm Purchase"
       then:
         - tap: "Cancel"
   else:
@@ -523,11 +534,11 @@ Nested conditionals:
 
 Multiple element check:
 ```yaml
-- if_all_exist: ["Save", "Share", "Edit"]
+- if_all_present: ["Save", "Share", "Edit"]
   then:
     - verify_screen: "Full editor mode"
   else:
-    - if_any_exist: ["Upgrade", "Go Premium"]
+    - if_any_present: ["Upgrade", "Go Premium"]
       then:
         - tap: "Maybe Later"
 ```
@@ -547,11 +558,9 @@ Screen-based check:
 |------|-----------|
 | `wait_for: "X"` | Poll `list_elements` until element found (10s timeout) |
 | `wait_for: {element: "X", timeout: 30s}` | Poll with custom timeout |
-| `if_present: "X"` | Check element, execute `then` steps if found |
+| `if_present: "X"` | Check element, execute `then` steps if found (see Conditional Actions) |
 | `retry: {attempts: 3, steps: [...]}` | Retry steps on failure |
 | `repeat: {times: 5, steps: [...]}` | Execute steps N times |
-
-**Note:** The `if_present` operator is deprecated. Use `if_exists` from Conditional Actions instead for better error handling and nesting support.
 
 ## Error Handling
 
