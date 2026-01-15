@@ -29,6 +29,9 @@ Generate Jetpack Compose code from design input with automated validation and de
 
 # Batch from folder
 /compose-design create --input ./designs/ --batch
+
+# Override output directory
+/compose-design create --input button.png --name CustomButton --type component --output ./features/custom/ui/
 ```
 
 ## Instructions for Claude
@@ -101,6 +104,15 @@ Check required arguments:
   - If provided, use this path instead of `config.output.default_output_dir`
   - Path can be relative or absolute
   - Directory will be created if it doesn't exist
+
+**Variable mapping** (arguments → bash variables):
+- `--name` → `$name`
+- `--type` → `$type`
+- `--input` → `$input_path` or `$input_url` (depending on source)
+- `--output` → `$output_override`
+- `--clipboard` → `$use_clipboard` (boolean flag)
+- `--batch` → `$batch_mode` (boolean flag)
+- `--device` → `$device_id`
 
 Exit with clear error if validation fails.
 
