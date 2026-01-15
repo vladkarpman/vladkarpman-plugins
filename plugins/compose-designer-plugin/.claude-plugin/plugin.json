@@ -12,7 +12,8 @@
   "keywords": ["compose", "android", "design", "figma", "ui-generation", "code-generation", "mobile"],
   "commands": [
     "./commands/config.md",
-    "./commands/create.md"
+    "./commands/create.md",
+    "./commands/scan-components.md"
   ],
   "agents": [
     "./agents/baseline-preprocessor.md",
