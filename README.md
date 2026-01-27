@@ -1,21 +1,23 @@
 # Vladkarpman Plugins
 
-A registry of Claude Code plugins by Vladislav Karpman.
-
-## Available Plugins
-
-| Plugin | Description | Install |
-|--------|-------------|---------|
-| [claude-skills](https://github.com/vladkarpman/claude-skills) | Collection of reusable skills (prompt-improver, etc.) | `claude plugin add vladkarpman/claude-skills` |
+A plugin marketplace for Claude Code by Vladislav Karpman.
 
 ## Installation
 
-Each plugin lives in its own repository. Install directly from GitHub:
-
 ```bash
-claude plugin add vladkarpman/<plugin-name>
+# Add this marketplace (one time)
+claude plugin marketplace add vladkarpman/claude-plugins
+
+# Install any plugin
+claude plugin install claude-skills
 ```
+
+## Available Plugins
+
+| Plugin | Description | Commands |
+|--------|-------------|----------|
+| [claude-skills](https://github.com/vladkarpman/claude-skills) | Collection of reusable skills for prompt engineering | `/improve-prompt`, `/build-prompt` |
 
 ## For Non-CLI Users
 
-If you're using Claude Desktop, Claude Cowork, or Claude.ai (web), visit the plugin repository and follow the instructions for copying skill/instruction content into your Claude settings.
+If you're using Claude Desktop, Claude Cowork, or Claude.ai (web), visit the plugin repository directly and follow the instructions for copying skill content into your Claude settings.

@@ -1,0 +1,21 @@
+{
+  "name": "vladkarpman-plugins",
+  "owner": {
+    "name": "Vladislav Karpman",
+    "email": "vladkarpman@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "claude-skills",
+      "description": "A collection of reusable skills for Claude (prompt-improver, etc.)",
+      "version": "1.0.0",
+      "source": {
+        "source": "github",
+        "repo": "vladkarpman/claude-skills"
+      },
+      "author": {
+        "name": "Vladislav Karpman"
+      }
+    }
+  ]
+}
